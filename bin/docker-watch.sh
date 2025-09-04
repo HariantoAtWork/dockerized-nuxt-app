@@ -2,6 +2,14 @@
 
 echo "=== WATCH PHASE STARTED ==="
 
+# Wait for supervisord to be ready by checking if supervisorctl works
+echo "Waiting for supervisord to be ready..."
+while ! supervisorctl status >/dev/null 2>&1; do
+    sleep 1
+done
+
+echo "Supervisord is ready. Proceeding with watch phase..."
+
 # Wait for initial build to complete
 echo "Waiting for initial build to complete..."
 while [ ! -f "${BUILD_COMPLETE_FLAG}" ]; do
@@ -14,6 +22,14 @@ echo "Starting update watcher..."
 restart_app() {
     echo "Restarting application..."
     supervisorctl restart app
+}
+
+# Function to force pull from remote (handles force pushes)
+force_pull() {
+    echo "Force pulling from remote..."
+    git fetch origin
+    git reset --hard origin/main
+    git clean -fd  # Remove untracked files
 }
 
 # Main watch loop
@@ -42,33 +58,58 @@ while true; do
             echo "New commits found! Triggering rebuild..."
             
             echo "Resetting existing build..."
-            git reset --hard HEAD
+            # git reset --hard HEAD
 
             # Pull latest changes
-            git pull origin main
-            
-            # Check for merge conflicts
-            if git status --porcelain | grep -q "^UU\|^AA\|^DD"; then
-                echo "Warning: Merge conflicts detected. Skipping update."
-            else
-                echo "Repository updated successfully. Rebuilding..."
+            # git pull origin main
+           
+           # -----
+echo "Repository updated successfully. Rebuilding..."
+                rm -rf ${BUILD_COMPLETE_FLAG}
                 
                 # Stop the app
-                supervisorctl stop app
+                # supervisorctl stop app
                 
                 # Trigger rebuild
-                supervisorctl start build
+                supervisorctl restart build
                 
                 # Wait for build to complete
+                echo "Waiting for build to complete..."
                 while [ ! -f "${BUILD_COMPLETE_FLAG}" ]; do
                     sleep 2
                 done
                 
                 # Start the app
-                supervisorctl start app
+                # supervisorctl start app
                 
-                echo "Application restarted with latest changes!"
-            fi
+                echo "--- Application restarted with latest changes!"
+
+           #-----
+            
+            # Check for merge conflicts
+            # if git status --porcelain | grep -q "^UU\|^AA\|^DD"; then
+            #     echo "Warning: Merge conflicts detected. Skipping update."
+            # else
+            #     echo "Repository updated successfully. Rebuilding..."
+            #     rm -rf ${BUILD_COMPLETE_FLAG}
+                
+            #     # Stop the app
+            #     # supervisorctl stop app
+                
+            #     # Trigger rebuild
+            #     supervisorctl restart build
+                
+            #     # Wait for build to complete
+            #     echo "Waiting for build to complete..."
+            #     while [ ! -f "${BUILD_COMPLETE_FLAG}" ]; do
+            #         sleep 2
+            #     done
+                
+            #     # Start the app
+            #     # supervisorctl start app
+                
+            #     echo "--- Application restarted with latest changes!"
+            # fi
         else
             echo "No updates available."
         fi
@@ -77,6 +118,6 @@ while true; do
     fi
     
     # Wait 5 minutes before next check
-    echo "Waiting 5 minutes before next check..."
-    sleep 300
+    echo "Waiting 1 minute before next check..."
+    sleep 60
 done

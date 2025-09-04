@@ -13,6 +13,14 @@ fi
 
 echo "Repository URL: ${GITHUB_REPO_URL}"
 
+# Function to force pull from remote (handles force pushes)
+force_pull() {
+    echo "Force pulling from remote..."
+    git fetch origin
+    git reset --hard origin/main
+    git clean -fd  # Remove untracked files
+}
+
 # Check if we need to build
 BUILD_NEEDED=false
 
@@ -40,10 +48,11 @@ if [ -d "${GITHUB_REPO}" ] && [ -d "${GITHUB_REPO}/.git" ]; then
         echo "Resetting existing build..."
         git reset --hard HEAD
 
-        echo "New commits found. Updating repository..."
-        git pull origin main
+        echo "New commits found. Force updating repository..."
+        # Handle force pushes by resetting to remote
+        force_pull
         
-        # Check for merge conflicts
+        # Check if the update was successful
         if git status --porcelain | grep -q "^UU\|^AA\|^DD"; then
             echo "Warning: Merge conflicts detected. Using current version."
         else
