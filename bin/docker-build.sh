@@ -77,30 +77,49 @@ if [ "$BUILD_NEEDED" = true ]; then
     # Remove build complete flag if it exists
     [ -f "${BUILD_COMPLETE_FLAG}" ] && rm "${BUILD_COMPLETE_FLAG}"
     
-    # Install pnpm if not already installed
-    if ! command -v pnpm >/dev/null 2>&1; then
-        echo "Installing pnpm..."
-        npm install -g pnpm
+    # Install bun if not already installed
+    if ! command -v bun >/dev/null 2>&1; then
+        echo "Installing bun..."
+        npm install -g bun
     fi
     
     # Install dependencies
     echo "Installing dependencies..."
-    pnpm install --frozen-lockfile
+    rm -rf node_modules
+    bun install
+    # bun install --frozen-lockfile
     
     # Build the application
     echo "Building Nuxt application..."
-    pnpm run build
-    
-    # # Rebuild native dependencies for the container platform
-    # echo "Rebuilding native dependencies for container platform..."
-    # cd .output/server
-    # npm rebuild
-    # cd ../..
-    
+    bun run build
+
     # Copy build to persistent location
-    echo "Saving build to persistent storage..."
+    echo "Saving build to persistent storage...${APP_ROOT}"
     # Use rsync to avoid "Resource busy" errors with volume mounts
-    rsync -av --progress --delete .output/ ${APP_OUTPUT}/
+    rsync -av --progress --delete ${APP_BUILD} ${APP_ROOT}
+
+    # Run build script
+    echo "Running build script..."
+    if [ -f "${PROJECT_BUILD_SCRIPT}" ]; then
+        chmod +x ${PROJECT_BUILD_SCRIPT}
+        ${PROJECT_BUILD_SCRIPT}
+    else
+        echo "Project build script not found. Skipping..."
+    fi
+
+    # Copy data to persistent storage
+    echo "Copying data to persistent storage..."
+    if [ ! -d "${APP_ROOT}/.data" ]; then
+        mkdir -p ${APP_ROOT}/.data
+    fi
+
+    if [ -d "${GITHUB_REPO}/.data" ]; then
+        rsync -av --ignore-existing --progress ${GITHUB_REPO}/.data ${APP_ROOT}/.data
+    else
+        echo "\`${GITHUB_REPO}/.data\` directory not found. Skipping..."
+    fi
+    
+    
     
     echo "Build completed successfully!"
 else

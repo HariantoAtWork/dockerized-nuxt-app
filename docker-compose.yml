@@ -14,7 +14,7 @@ services:
       - .env
     volumes:
       # Persistent storage for repository, build, and data
-      - ./data:/app/.data
+      - .data:/app/.data
       # pnpm cache for faster builds
       - pnpm-store:/root/.local/share/pnpm
       - bun-cache:/root/.bun/install/cache
