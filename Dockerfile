@@ -8,7 +8,7 @@ ENV BETTER_AUTH_TELEMETRY_DEBUG=0
 
 # Environment variables #2
 ENV APP_ROOT="/app"
-ENV GITHUB_REPO="${APP_ROOT}/repo"
+ENV GITHUB_REPO="/repo"
 ENV APP_BUILD="${GITHUB_REPO}/.output"
 ENV APP_OUTPUT="${APP_ROOT}/.output"
 ENV CURRENT_COMMIT_FILE="${APP_ROOT}/.current_commit"
