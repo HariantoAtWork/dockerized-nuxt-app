@@ -36,7 +36,8 @@ COPY bin/ /usr/local/bin/
 RUN chmod +x /usr/local/bin/*
 
 # Copy supervisord configuration
-COPY conf.d/supervisord.conf /etc/supervisor/conf.d/
+COPY conf.d/supervisord.conf /etc/supervisord.conf
+
 # Create log directory
 RUN mkdir -p /var/log/supervisor
 
@@ -47,4 +48,4 @@ FROM scripts AS final
 EXPOSE 3000
 
 # Start supervisord
-CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]
+CMD ["/usr/bin/supervisord", "-c", "/etc/supervisord.conf"]

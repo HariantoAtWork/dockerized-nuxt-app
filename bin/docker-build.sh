@@ -96,7 +96,7 @@ if [ "$BUILD_NEEDED" = true ]; then
     # Copy build to persistent location
     echo "Saving build to persistent storage...${APP_ROOT}"
     # Use rsync to avoid "Resource busy" errors with volume mounts
-    rsync -av --progress --delete ${APP_BUILD} ${APP_ROOT}
+    rsync -av --delete ${APP_BUILD} ${APP_ROOT}
 
     # Run build script
     echo "Running build script..."
@@ -114,7 +114,7 @@ if [ "$BUILD_NEEDED" = true ]; then
     fi
 
     if [ -d "${GITHUB_REPO}/.data" ]; then
-        rsync -av --ignore-existing --progress ${GITHUB_REPO}/.data ${APP_ROOT}/.data
+        rsync -av --ignore-existing ${GITHUB_REPO}/.data ${APP_ROOT}/.data
     else
         echo "\`${GITHUB_REPO}/.data\` directory not found. Skipping..."
     fi

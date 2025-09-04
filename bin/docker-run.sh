@@ -21,5 +21,5 @@ cd ${APP_ROOT}
 # Start the Node.js server from the .output directory
 echo "Starting NODEMON for Node.js server..."
 exec nodemon --watch ${APP_OUTPUT} --cwd ${APP_ROOT} .output/server/index.mjs
-# exec bun --watch /app/.output --exec "bun /app/.output/server/index.mjs"
-# exec node ${APP_ROOT}/.output/server/index.mjs
+# Alternative: exec bun --watch ${APP_OUTPUT} --exec "bun ${APP_OUTPUT}/server/index.mjs"
+# Alternative: exec node ${APP_ROOT}/.output/server/index.mjs
