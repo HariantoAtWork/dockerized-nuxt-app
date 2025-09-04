@@ -126,8 +126,8 @@ else
     echo "No build needed. Using existing build."
 fi
 
-# Create necessary directories
-mkdir -p ${APP_ROOT}/.data
+# # Create necessary directories
+# mkdir -p ${APP_ROOT}/.data
 
 echo "=== BUILD PHASE COMPLETED ==="
 
