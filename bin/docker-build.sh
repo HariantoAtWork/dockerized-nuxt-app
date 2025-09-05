@@ -18,7 +18,7 @@ force_pull() {
     echo "Force pulling from remote..."
     git fetch origin
     git reset --hard origin/main
-    git clean -fd  # Remove untracked files
+    git clean -fd # Remove untracked files
 }
 
 # Check if we need to build
@@ -28,19 +28,19 @@ BUILD_NEEDED=false
 if [ -d "${GITHUB_REPO}" ] && [ -d "${GITHUB_REPO}/.git" ]; then
     echo "Repository exists. Checking for updates..."
     cd ${GITHUB_REPO}
-    
+
     # Get current commit hash
     CURRENT_COMMIT=$(git rev-parse HEAD)
     echo "Current commit: $CURRENT_COMMIT"
-    echo "$CURRENT_COMMIT" > ${CURRENT_COMMIT_FILE}
-    
+    echo "$CURRENT_COMMIT" >${CURRENT_COMMIT_FILE}
+
     # Fetch latest changes
     git fetch origin
-    
+
     # Get latest commit hash
     LATEST_COMMIT=$(git rev-parse origin/main)
     echo "Latest commit: $LATEST_COMMIT"
-    echo "$LATEST_COMMIT" > ${LAST_COMMIT_FILE}
+    echo "$LATEST_COMMIT" >${LAST_COMMIT_FILE}
 
     # Check if there are new commits
     if [ "$CURRENT_COMMIT" != "$LATEST_COMMIT" ]; then
@@ -51,7 +51,7 @@ if [ -d "${GITHUB_REPO}" ] && [ -d "${GITHUB_REPO}/.git" ]; then
         echo "New commits found. Force updating repository..."
         # Handle force pushes by resetting to remote
         force_pull
-        
+
         # Check if the update was successful
         if git status --porcelain | grep -q "^UU\|^AA\|^DD"; then
             echo "Warning: Merge conflicts detected. Using current version."
@@ -61,7 +61,7 @@ if [ -d "${GITHUB_REPO}" ] && [ -d "${GITHUB_REPO}/.git" ]; then
         fi
     else
         echo "Repository is up to date."
-        
+
         # Check if build exists
         if [ ! -d "${APP_BUILD}" ] || [ ! -f "${APP_BUILD}/server/index.mjs" ]; then
             echo "Build directory missing or incomplete. Rebuild needed."
@@ -72,7 +72,7 @@ if [ -d "${GITHUB_REPO}" ] && [ -d "${GITHUB_REPO}/.git" ]; then
     fi
 else
     echo "Repository not found. Cloning for the first time..."
-    
+
     # Clone the repository
     git clone --depth 1 "$GITHUB_REPO_URL" ${GITHUB_REPO}
     cd ${GITHUB_REPO}
@@ -85,19 +85,19 @@ if [ "$BUILD_NEEDED" = true ]; then
 
     # Remove build complete flag if it exists
     [ -f "${BUILD_COMPLETE_FLAG}" ] && rm "${BUILD_COMPLETE_FLAG}"
-    
+
     # Install bun if not already installed
     if ! command -v bun >/dev/null 2>&1; then
         echo "Installing bun..."
         npm install -g bun
     fi
-    
+
     # Install dependencies
     echo "Installing dependencies..."
     rm -rf node_modules
     bun install
     # bun install --frozen-lockfile
-    
+
     # Build the application
     echo "Building Nuxt application..."
     bun run build
@@ -118,21 +118,19 @@ if [ "$BUILD_NEEDED" = true ]; then
 
     # Copy data to persistent storage
     echo "Copying data to persistent storage..."
-    if [ ! -d "${APP_ROOT}/.data" ]; then
-        mkdir -p ${APP_ROOT}/.data
-    fi
+    # if [ ! -d "${APP_ROOT}/.data" ]; then
+    #     mkdir -p ${APP_ROOT}/.data
+    # fi
 
-    if [ -d "${GITHUB_REPO}/.data" ]; then
-        rsync -av --ignore-existing ${GITHUB_REPO}/.data ${APP_ROOT}/.data
-    else
-        echo "\`${GITHUB_REPO}/.data\` directory not found. Skipping..."
-    fi
-    
-    
-    
     echo "Build completed successfully!"
 else
     echo "No build needed. Using existing build."
+fi
+
+if [ -d "${GITHUB_REPO}/.data" ]; then
+    rsync -av --ignore-existing ${GITHUB_REPO}/.data/. ${APP_ROOT}/.data
+else
+    echo "\`${GITHUB_REPO}/.data\` directory not found. Skipping..."
 fi
 
 # # Create necessary directories
