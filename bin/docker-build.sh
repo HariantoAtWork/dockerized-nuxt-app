@@ -95,7 +95,7 @@ if [ "$BUILD_NEEDED" = true ]; then
     # Install dependencies
     echo "Installing dependencies..."
     rm -rf node_modules
-    bun install
+    bun ci
     # bun install --frozen-lockfile
 
     # Build the application
