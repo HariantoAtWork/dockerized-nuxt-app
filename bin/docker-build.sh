@@ -71,11 +71,34 @@ if [ -d "${GITHUB_REPO}" ] && [ -d "${GITHUB_REPO}/.git" ]; then
         fi
     fi
 else
-    echo "[BUILD] Repository not found. Cloning for the first time..."
+    echo "[BUILD] Repository not found. Checking if folder exists without .git..."
 
-    # Clone the repository
-    git clone --depth 1 "$GITHUB_REPO_URL" ${GITHUB_REPO}
-    cd ${GITHUB_REPO}
+    # Check if folder exists but without .git
+    if [ -d "${GITHUB_REPO}" ] && [ ! -d "${GITHUB_REPO}/.git" ]; then
+        echo "[BUILD] Folder exists but .git is missing. Cloning .git only..."
+
+        # Clone to temporary directory
+        TEMP_REPO="${GITHUB_REPO}_temp"
+        git clone "$GITHUB_REPO_URL" ${TEMP_REPO}
+
+        # Move .git folder to existing directory
+        mv ${TEMP_REPO}/.git ${GITHUB_REPO}/.git
+
+        # Remove temporary directory
+        rm -rf ${TEMP_REPO}
+
+        # Change to repo directory and reset
+        cd ${GITHUB_REPO}
+        git reset --hard HEAD
+        git clean -fd
+    else
+        echo "[BUILD] Cloning repository for the first time..."
+
+        # Clone the repository
+        git clone "$GITHUB_REPO_URL" ${GITHUB_REPO}
+        cd ${GITHUB_REPO}
+    fi
+
     BUILD_NEEDED=true
 fi
 

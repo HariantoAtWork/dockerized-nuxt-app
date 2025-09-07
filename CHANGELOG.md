@@ -2,6 +2,24 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2025-09-07T23:13:15+0200]
+
+### Added
+- Added smart repository recovery for cases where folder exists but `.git` directory is missing
+- Implemented efficient `.git`-only cloning using temporary directory approach
+
+### Changed
+- Updated repository cloning logic to handle corrupted or incomplete git repositories
+- Added logging prefixes `[BUILD]` to all build script messages for better log readability
+- Changed `bun install` to `bun ci` for faster, more reliable dependency installation
+- Commented out rsync operations for build and data copying (can be re-enabled if needed)
+
+### Technical Details
+- Added check for `[ -d "${GITHUB_REPO}" ] && [ ! -d "${GITHUB_REPO}/.git" ]` condition
+- Implemented temporary clone approach: clone to temp dir, move `.git`, remove temp dir
+- Uses `git reset --hard HEAD && git clean -fd` to restore clean working directory
+- All build messages now prefixed with `[BUILD]` for better log filtering
+
 ## [2025-09-04T21:58:58+0200]
 
 ### Added
