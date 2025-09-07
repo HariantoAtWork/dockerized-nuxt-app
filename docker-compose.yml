@@ -1,12 +1,11 @@
 # version: '3.8'
-
 services:
   nuxt-app:
     build:
       context: .
       dockerfile: Dockerfile
     ports:
-      - "3000:3000"
+      - "3300:3000"
     environment:
       - NODE_ENV=production
       - GITHUB_REPO_URL=${GITHUB_REPO_URL}
@@ -14,9 +13,7 @@ services:
       - .env
     volumes:
       # Persistent storage for repository, build, and data
-      # - .data:/app/.data
-      - .data/repo:/repo
-      - .data/app:/app
+      - ./data/app:/app
       # pnpm cache for faster builds
       - pnpm-store:/root/.local/share/pnpm
       - bun-cache:/root/.bun/install/cache
