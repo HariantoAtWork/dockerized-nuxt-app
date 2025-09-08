@@ -120,7 +120,7 @@ if [ "$BUILD_NEEDED" = true ]; then
     # rm -rf node_modules
 
     echo "[BUILD] --- Running bun ci..."
-    bun ci
+    bun run ci
     # bun install --frozen-lockfile
 
     # Run build script
@@ -131,6 +131,12 @@ if [ "$BUILD_NEEDED" = true ]; then
     # else
     #     echo "[BUILD] --- Project build script not found. Skipping..."
     # fi
+
+    echo "[BUILD] Waiting for generated output folder to be created..."
+    while [ ! -d "${APP_OUTPUT}" ]; do
+        sleep 2
+    done
+    echo "[BUILD] Generated output folder created."
 
     # Build the application
     # echo "[BUILD] Building Nuxt application..."
