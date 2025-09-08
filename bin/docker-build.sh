@@ -117,30 +117,32 @@ if [ "$BUILD_NEEDED" = true ]; then
 
     # Install dependencies
     echo "[BUILD] Installing dependencies..."
-    rm -rf node_modules
+    # rm -rf node_modules
+
+    echo "[BUILD] --- Running bun ci..."
     bun ci
     # bun install --frozen-lockfile
 
+    # Run build script
+    # echo "[BUILD] --- Running build script first..."
+    # if [ -f "${PROJECT_BUILD_SCRIPT}" ]; then
+    #     chmod +x ${PROJECT_BUILD_SCRIPT}
+    #     ${PROJECT_BUILD_SCRIPT}
+    # else
+    #     echo "[BUILD] --- Project build script not found. Skipping..."
+    # fi
+
     # Build the application
-    echo "[BUILD] Building Nuxt application..."
-    bun run build
+    # echo "[BUILD] Building Nuxt application..."
+    # bun run build
 
     # Copy build to persistent location
-    echo "[BUILD] Saving build to persistent storage...${APP_ROOT}"
+    # echo "[BUILD] Saving build to persistent storage...${APP_ROOT}"
     # Use rsync to avoid "Resource busy" errors with volume mounts
     # rsync -av --delete ${APP_BUILD} ${APP_ROOT}
 
-    # Run build script
-    echo "[BUILD] Running build script..."
-    if [ -f "${PROJECT_BUILD_SCRIPT}" ]; then
-        chmod +x ${PROJECT_BUILD_SCRIPT}
-        ${PROJECT_BUILD_SCRIPT}
-    else
-        echo "[BUILD] Project build script not found. Skipping..."
-    fi
-
     # Copy data to persistent storage
-    echo "[BUILD] Copying data to persistent storage..."
+    # echo "[BUILD] Copying data to persistent storage..."
     # if [ ! -d "${APP_ROOT}/.data" ]; then
     #     mkdir -p ${APP_ROOT}/.data
     # fi
