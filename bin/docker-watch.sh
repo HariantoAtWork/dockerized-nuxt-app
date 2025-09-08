@@ -4,7 +4,7 @@ echo "[WATCH] === WATCH PHASE STARTED ==="
 
 # Wait for supervisord to be ready by checking if supervisorctl works
 echo "[WATCH] Waiting for supervisord to be ready..."
-while ! supervisorctl status >/dev/null 2>&1; do
+while ! supervisorctl version >/dev/null 2>&1; do
     sleep 1
 done
 

@@ -2,6 +2,23 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2025-09-08T11:40:48+0200]
+
+### Fixed
+- Fixed inconsistent supervisord readiness check in `docker-watch.sh` by using `supervisorctl version` instead of `status`
+- Resolved issue where script would wait indefinitely due to exit code 3 from `supervisorctl status`
+
+### Changed
+- Updated supervisord readiness check to use `supervisorctl version` which always returns exit code 0 when accessible
+- Simplified the check from complex exit code handling to a simple accessibility test
+- Removed debug logging as it's no longer needed
+
+### Technical Details
+- Discovered that `supervisorctl status` returns exit code 3 when some processes are EXITED/STOPPED (normal state)
+- Changed from `while ! supervisorctl status >/dev/null 2>&1` to `while ! supervisorctl version >/dev/null 2>&1`
+- `supervisorctl version` only fails (exit code ≠ 0) when supervisord is not accessible, making it perfect for readiness check
+- This allows the script to proceed as soon as supervisorctl commands are functional, regardless of individual process states
+
 ## [2025-09-07T23:13:15+0200]
 
 ### Added
