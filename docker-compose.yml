@@ -1,4 +1,12 @@
 # version: '3.8'
+volumes:
+  # External volumes for pnpm and bun cache
+  # -- docker volume create pnpm-store && docker volume create bun-cache
+  bun-cache:
+    external: true
+  pnpm-store:
+    external: true
+
 services:
   nuxt-app:
     build:
@@ -10,10 +18,11 @@ services:
       - NODE_ENV=production
       - GITHUB_REPO_URL=${GITHUB_REPO_URL}
     env_file:
-      - .env
+      - .env.better-auth
     volumes:
       # Persistent storage for repository, build, and data
       - ./data/app:/app
+      - ./data/data:/data
       # pnpm cache for faster builds
       - pnpm-store:/root/.local/share/pnpm
       - bun-cache:/root/.bun/install/cache
@@ -24,9 +33,3 @@ services:
       timeout: 10s
       retries: 3
       start_period: 60s
-
-volumes:
-  bun-cache:
-    driver: local
-  pnpm-store:
-    driver: local
