@@ -31,7 +31,7 @@ if [ -d "${GITHUB_REPO}" ] && [ -d "${GITHUB_REPO}/.git" ]; then
 
     # Get current commit hash
     CURRENT_COMMIT=$(git rev-parse HEAD)
-    echo "[BUILD] Current commit: $CURRENT_COMMIT"
+    echo "[BUILD] --- Current commit: $CURRENT_COMMIT"
     echo "[BUILD] $CURRENT_COMMIT" >${CURRENT_COMMIT_FILE}
 
     # Fetch latest changes
@@ -39,7 +39,7 @@ if [ -d "${GITHUB_REPO}" ] && [ -d "${GITHUB_REPO}/.git" ]; then
 
     # Get latest commit hash
     LATEST_COMMIT=$(git rev-parse origin/main)
-    echo "[BUILD] Latest commit: $LATEST_COMMIT"
+    echo "[BUILD] ---  Latest commit: $LATEST_COMMIT"
     echo "[BUILD] $LATEST_COMMIT" >${LAST_COMMIT_FILE}
 
     # Check if there are new commits
