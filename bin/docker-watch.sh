@@ -1,32 +1,46 @@
 #!/bin/sh
 
-echo "[WATCH] === WATCH PHASE STARTED ==="
+# Check if verbose logging is enabled (default: true)
+VERBOSE_LOGGING=${VERBOSE_LOGGING:-true}
+
+# Logging function
+log_info() {
+    if [ "$VERBOSE_LOGGING" = "true" ]; then
+        echo "[WATCH] $1"
+    fi
+}
+
+log_error() {
+    echo "[WATCH] ERROR: $1" >&2
+}
+
+log_info "=== WATCH PHASE STARTED ==="
 
 # Wait for supervisord to be ready by checking if supervisorctl works
-echo "[WATCH] Waiting for supervisord to be ready..."
+log_info "Waiting for supervisord to be ready..."
 while ! supervisorctl version >/dev/null 2>&1; do
     sleep 1
 done
 
-echo "[WATCH] Supervisord is ready. Proceeding with watch phase..."
+log_info "Supervisord is ready. Proceeding with watch phase..."
 
 # Wait for initial build to complete
-echo "[WATCH] Waiting for initial build to complete..."
+log_info "Waiting for initial build to complete..."
 while [ ! -f "${BUILD_COMPLETE_FLAG}" ]; do
     sleep 5
 done
 
-echo "[WATCH] Starting update watcher..."
+log_info "Starting update watcher..."
 
 # Function to restart the app process
 restart_app() {
-    echo "[WATCH] Restarting application..."
+    log_info "Restarting application..."
     supervisorctl restart app
 }
 
 # Main watch loop
 while true; do
-    echo "[WATCH] Checking for updates..."
+    log_info "Checking for updates..."
 
     # Check if repository exists
     if [ -d "${GITHUB_REPO}" ] && [ -d "${GITHUB_REPO}/.git" ]; then
@@ -36,7 +50,7 @@ while true; do
 
         # Get current commit hash
         CURRENT_COMMIT=$(git rev-parse HEAD)
-        echo "[WATCH] Current commit: $CURRENT_COMMIT"
+        log_info "Current commit: $CURRENT_COMMIT"
         echo "[WATCH] $CURRENT_COMMIT" >${CURRENT_COMMIT_FILE}
 
         # Fetch latest changes
@@ -44,12 +58,12 @@ while true; do
 
         # Get latest commit hash
         LATEST_COMMIT=$(git rev-parse origin/main)
-        echo "[WATCH] Latest commit: $LATEST_COMMIT"
+        log_info "Latest commit: $LATEST_COMMIT"
         echo "[WATCH] $LATEST_COMMIT" >${LAST_COMMIT_FILE}
 
         # Check if there are new commits
         if [ "$CURRENT_COMMIT" != "$LATEST_COMMIT" ]; then
-            echo "[WATCH] New commits found! Triggering rebuild..."
+            log_info "New commits found! Triggering rebuild..."
 
             echo "[WATCH] Resetting existing build..."
             # git reset --hard HEAD
@@ -58,27 +72,27 @@ while true; do
             # git pull origin main
 
             # -----
-            echo "[WATCH] Repository updated successfully. Rebuilding..."
+            log_info "Repository updated successfully. Rebuilding..."
             # rm -rf ${BUILD_COMPLETE_FLAG}
 
             # Stop the app
             # supervisorctl stop app
 
             # Trigger rebuild
-            echo "[WATCH] Restarting build..."
+            log_info "Restarting build..."
             supervisorctl restart build
 
             # Wait for build to complete
-            echo "[WATCH] Waiting for build to complete..."
+            log_info "Waiting for build to complete..."
             while [ ! -f "${BUILD_COMPLETE_FLAG}" ]; do
                 sleep 2
             done
 
             # Start the app
-            echo "[WATCH] Restarting application..."
+            log_info "Restarting application..."
             supervisorctl restart app
 
-            echo "[WATCH] --- Application restarted with latest changes!"
+            log_info "--- Application restarted with latest changes!"
 
             #-----
 
@@ -107,13 +121,13 @@ while true; do
             #     echo "[WATCH] --- Application restarted with latest changes!"
             # fi
         else
-            echo "[WATCH] No updates available."
+            log_info "No updates available."
         fi
     else
-        echo "[WATCH] Repository not found. Skipping update check."
+        log_error "Repository not found. Skipping update check."
     fi
 
     # Wait 5 minutes before next check
-    echo "[WATCH] Waiting 1 minute before next check..."
+    log_info "Waiting 1 minute before next check..."
     sleep 60
 done

@@ -1,16 +1,30 @@
 #!/bin/sh
 
-echo "[RUN] === RUN PHASE STARTED ==="
+# Check if verbose logging is enabled (default: true)
+VERBOSE_LOGGING=${VERBOSE_LOGGING:-true}
+
+# Logging function
+log_info() {
+    if [ "$VERBOSE_LOGGING" = "true" ]; then
+        echo "[RUN] $1"
+    fi
+}
+
+log_error() {
+    echo "[RUN] ERROR: $1" >&2
+}
+
+log_info "=== RUN PHASE STARTED ==="
 
 # Wait for build to complete
-echo "[RUN] Waiting for build to complete..."
+log_info "Waiting for build to complete..."
 while [ ! -f "${BUILD_COMPLETE_FLAG}" ]; do
     sleep 2
 done
 
-echo "[RUN] Build complete. Starting application..."
+log_info "Build complete. Starting application..."
 
-echo "[RUN] Waiting for generated output folder to be created..."
+log_info "Waiting for generated output folder to be created..."
 while [ ! -d "${APP_OUTPUT}" ]; do
     sleep 2
 done
@@ -19,7 +33,7 @@ done
 cd ${APP_ROOT}
 
 # Start the Node.js server from the .output directory
-echo "[RUN] Starting NODEMON for Node.js server..."
+log_info "Starting NODEMON for Node.js server..."
 exec nodemon --watch ${APP_OUTPUT} --cwd ${APP_ROOT} .output/server/index.mjs
 # Alternative: exec bun --watch "${APP_OUTPUT}/server/index.mjs"
 # Alternative: exec node ${APP_ROOT}/.output/server/index.mjs

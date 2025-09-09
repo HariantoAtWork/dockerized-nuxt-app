@@ -2,6 +2,44 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2025-09-09T15:45:05+0200]
+
+### Added
+- Extended configurable logging system to all three scripts: `docker-build.sh`, `docker-run.sh`, and `docker-watch.sh`
+- Implemented consistent `log_info()` and `log_error()` functions across all scripts
+- Added unified logging control with single `VERBOSE_LOGGING` environment variable
+
+### Changed
+- Updated `docker-run.sh` to use new logging functions for all informational messages
+- Updated `docker-watch.sh` to use new logging functions for all informational messages
+- Modified error messages in watch script to use `log_error()` function (always visible)
+- Updated informational messages in all scripts to use `log_info()` function (conditional)
+
+### Technical Details
+- All scripts now use `VERBOSE_LOGGING=${VERBOSE_LOGGING:-true}` with default value
+- `log_info()` only outputs when `VERBOSE_LOGGING=true` in all scripts
+- `log_error()` always outputs to stderr regardless of verbose setting in all scripts
+- Set `VERBOSE_LOGGING=false` in `.env` to disable verbose logging across all scripts (errors only)
+- Consistent logging prefixes: `[BUILD]`, `[RUN]`, `[WATCH]` for easy log filtering
+
+## [2025-09-09T15:42:54+0200]
+
+### Added
+- Added configurable logging system with `VERBOSE_LOGGING` environment variable
+- Implemented `log_info()` and `log_error()` functions for conditional logging
+- Added logging configuration documentation to README.md
+
+### Changed
+- Updated build script to use new logging functions for better log control
+- Modified error messages to use `log_error()` function (always visible)
+- Updated informational messages to use `log_info()` function (conditional)
+
+### Technical Details
+- Added `VERBOSE_LOGGING=${VERBOSE_LOGGING:-true}` with default value
+- `log_info()` only outputs when `VERBOSE_LOGGING=true`
+- `log_error()` always outputs to stderr regardless of verbose setting
+- Set `VERBOSE_LOGGING=false` in `.env` to disable verbose logging (errors only)
+
 ## [2025-09-09T15:11:14+0200]
 
 ### Added

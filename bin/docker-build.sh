@@ -2,23 +2,37 @@
 
 set -e
 
-echo "[BUILD] === BUILD PHASE STARTED ==="
+# Check if verbose logging is enabled (default: true)
+VERBOSE_LOGGING=${VERBOSE_LOGGING:-true}
+
+# Logging function
+log_info() {
+    if [ "$VERBOSE_LOGGING" = "true" ]; then
+        echo "[BUILD] $1"
+    fi
+}
+
+log_error() {
+    echo "[BUILD] ERROR: $1" >&2
+}
+
+log_info "=== BUILD PHASE STARTED ==="
 
 # Remove build complete flag if it exists
 [ -f "${BUILD_COMPLETE_FLAG}" ] && rm "${BUILD_COMPLETE_FLAG}"
 
 # Check if GITHUB_REPO_URL is provided
 if [ -z "$GITHUB_REPO_URL" ]; then
-    echo "[BUILD] Error: GITHUB_REPO_URL environment variable is required"
-    echo "[BUILD] Format: https://TOKEN@github.com/username/repository.git"
+    log_error "GITHUB_REPO_URL environment variable is required"
+    log_error "Format: https://TOKEN@github.com/username/repository.git"
     exit 1
 fi
 
-echo "[BUILD] Repository URL: ${GITHUB_REPO_URL}"
+log_info "Repository URL: ${GITHUB_REPO_URL}"
 
 # Function to force pull from remote (handles force pushes)
 force_pull() {
-    echo "[BUILD] Force pulling from remote..."
+    log_info "Force pulling from remote..."
     git fetch origin
     git reset --hard origin/main
     git clean -fd # Remove untracked files

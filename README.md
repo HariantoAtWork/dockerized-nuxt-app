@@ -28,6 +28,9 @@ Create a `.env` file for Docker environment variables:
 # Docker environment variables
 GITHUB_REPO_URL=https://YOUR_TOKEN@github.com/username/repository.git
 DOCKER_HUB_IMAGE=your-registry/nuxt-app:latest
+
+# Logging Configuration
+VERBOSE_LOGGING=true  # Set to false to disable verbose logging (only show errors)
 ```
 
 Create a `.env.app` file for application-specific environment variables:
@@ -110,6 +113,7 @@ Supervisor manages three main processes:
 |----------|-------------|----------|
 | `GITHUB_REPO_URL` | GitHub repository URL with token | Yes |
 | `DOCKER_HUB_IMAGE` | Docker image for production | Production only |
+| `VERBOSE_LOGGING` | Enable verbose logging (true/false) | No (default: true) |
 
 #### Application Environment (`.env.app`)
 | Variable | Description | Required |
