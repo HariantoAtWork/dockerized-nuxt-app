@@ -2,6 +2,24 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2025-09-09T15:11:14+0200]
+
+### Added
+- Created comprehensive README.md with complete project documentation
+- Added detailed setup instructions for development and production environments
+- Documented architecture, process management, and deployment procedures
+- Included troubleshooting guide and monitoring instructions
+- Added environment variable documentation and configuration examples
+
+### Fixed
+- Corrected environment variable configuration to properly distinguish between `.env` (Docker variables) and `.env.app` (application variables)
+- Updated documentation to reflect the correct usage of `.env` for Docker environment variables and `.env.app` for application-specific variables
+
+### Changed
+- Updated package manager documentation to reflect Bun as primary and pnpm as alternative
+- Reordered volume creation commands to prioritise Bun cache
+- Updated build process description to clarify Bun as the primary package manager
+
 ## [2025-09-08T11:40:48+0200]
 
 ### Fixed
