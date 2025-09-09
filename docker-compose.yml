@@ -18,7 +18,7 @@ services:
       - NODE_ENV=production
       - GITHUB_REPO_URL=${GITHUB_REPO_URL}
     env_file:
-      - .env
+      - .env.app
     volumes:
       # Persistent storage for repository, build, and data
       - ./data/app:/app
