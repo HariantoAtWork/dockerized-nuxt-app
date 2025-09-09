@@ -4,7 +4,7 @@ echo "[RUN] === RUN PHASE STARTED ==="
 
 # Wait for build to complete
 echo "[RUN] Waiting for build to complete..."
-while [ ! -f "${APP_ROOT}/.build-complete.flag" ]; do
+while [ ! -f "${BUILD_COMPLETE_FLAG}" ]; do
     sleep 2
 done
 

@@ -4,6 +4,9 @@ set -e
 
 echo "[BUILD] === BUILD PHASE STARTED ==="
 
+# Remove build complete flag if it exists
+[ -f "${BUILD_COMPLETE_FLAG}" ] && rm "${BUILD_COMPLETE_FLAG}"
+
 # Check if GITHUB_REPO_URL is provided
 if [ -z "$GITHUB_REPO_URL" ]; then
     echo "[BUILD] Error: GITHUB_REPO_URL environment variable is required"
@@ -106,8 +109,8 @@ fi
 if [ "$BUILD_NEEDED" = true ]; then
     echo "[BUILD] Building application..."
 
-    # Remove build complete flag if it exists
-    [ -f "${BUILD_COMPLETE_FLAG}" ] && rm "${BUILD_COMPLETE_FLAG}"
+    # # Remove build complete flag if it exists
+    # [ -f "${BUILD_COMPLETE_FLAG}" ] && rm "${BUILD_COMPLETE_FLAG}"
 
     # Install bun if not already installed
     if ! command -v bun >/dev/null 2>&1; then
@@ -115,43 +118,14 @@ if [ "$BUILD_NEEDED" = true ]; then
         npm install -g bun
     fi
 
-    # Install dependencies
-    echo "[BUILD] Installing dependencies..."
-    # rm -rf node_modules
-
-    echo "[BUILD] --- Running bun ci..."
+    echo "[BUILD] --- Running \`bun run ci\`..."
     bun run ci
-    # bun install --frozen-lockfile
-
-    # Run build script
-    # echo "[BUILD] --- Running build script first..."
-    # if [ -f "${PROJECT_BUILD_SCRIPT}" ]; then
-    #     chmod +x ${PROJECT_BUILD_SCRIPT}
-    #     ${PROJECT_BUILD_SCRIPT}
-    # else
-    #     echo "[BUILD] --- Project build script not found. Skipping..."
-    # fi
 
     echo "[BUILD] Waiting for generated output folder to be created..."
     while [ ! -d "${APP_OUTPUT}" ]; do
         sleep 2
     done
     echo "[BUILD] Generated output folder created."
-
-    # Build the application
-    # echo "[BUILD] Building Nuxt application..."
-    # bun run build
-
-    # Copy build to persistent location
-    # echo "[BUILD] Saving build to persistent storage...${APP_ROOT}"
-    # Use rsync to avoid "Resource busy" errors with volume mounts
-    # rsync -av --delete ${APP_BUILD} ${APP_ROOT}
-
-    # Copy data to persistent storage
-    # echo "[BUILD] Copying data to persistent storage..."
-    # if [ ! -d "${APP_ROOT}/.data" ]; then
-    #     mkdir -p ${APP_ROOT}/.data
-    # fi
 
     echo "[BUILD] Build completed successfully!"
 else
@@ -164,10 +138,9 @@ fi
 #     echo "[BUILD] \`${GITHUB_REPO}/.data\` directory not found. Skipping..."
 # fi
 
-# # Create necessary directories
-# mkdir -p ${APP_ROOT}/.data
-
 echo "[BUILD] === BUILD PHASE COMPLETED ==="
 
 # Signal that build is complete and app can start
 touch ${BUILD_COMPLETE_FLAG}
+
+supervisorctl restart app

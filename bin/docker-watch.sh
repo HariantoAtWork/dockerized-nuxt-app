@@ -24,14 +24,6 @@ restart_app() {
     supervisorctl restart app
 }
 
-# Function to force pull from remote (handles force pushes)
-force_pull() {
-    echo "[WATCH] Force pulling from remote..."
-    git fetch origin
-    git reset --hard origin/main
-    git clean -fd # Remove untracked files
-}
-
 # Main watch loop
 while true; do
     echo "[WATCH] Checking for updates..."
@@ -67,12 +59,13 @@ while true; do
 
             # -----
             echo "[WATCH] Repository updated successfully. Rebuilding..."
-            rm -rf ${BUILD_COMPLETE_FLAG}
+            # rm -rf ${BUILD_COMPLETE_FLAG}
 
             # Stop the app
             # supervisorctl stop app
 
             # Trigger rebuild
+            echo "[WATCH] Restarting build..."
             supervisorctl restart build
 
             # Wait for build to complete
@@ -82,7 +75,8 @@ while true; do
             done
 
             # Start the app
-            # supervisorctl start app
+            echo "[WATCH] Restarting application..."
+            supervisorctl restart app
 
             echo "[WATCH] --- Application restarted with latest changes!"
 
