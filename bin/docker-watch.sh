@@ -34,8 +34,19 @@ log_info "Starting update watcher..."
 
 # Function to restart the app process
 restart_app() {
-    log_info "Restarting application..."
-    supervisorctl restart app
+    # Check if app is already running
+    APP_STATUS=$(supervisorctl status app 2>/dev/null | awk '{print $2}')
+
+    if [ "$APP_STATUS" = "RUNNING" ]; then
+        log_info "Application is already running. Skipping restart."
+        return 0
+    elif [ "$APP_STATUS" = "STOPPED" ] || [ "$APP_STATUS" = "EXITED" ]; then
+        log_info "Application is stopped. Starting..."
+        supervisorctl start app
+    else
+        log_info "Application status unknown ($APP_STATUS). Restarting..."
+        supervisorctl restart app
+    fi
 }
 
 # Main watch loop
@@ -89,8 +100,7 @@ while true; do
             done
 
             # Start the app
-            log_info "Restarting application..."
-            supervisorctl restart app
+            restart_app
 
             log_info "--- Application restarted with latest changes!"
 
