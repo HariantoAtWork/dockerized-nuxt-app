@@ -132,8 +132,27 @@ if [ "$BUILD_NEEDED" = true ]; then
         npm install -g bun
     fi
 
-    echo "[BUILD] --- Running \`bun run ci\`..."
-    bun run ci
+    if [ ! -f package.json ]; then
+        log_error "package.json not found in $(pwd)"
+        exit 1
+    fi
+
+    # Skip `bun run ci` when package.json has no scripts.ci entry (otherwise it exits non‑zero).
+    CI_MODE=$(bun -e '
+        const pkg = JSON.parse(await Bun.file("package.json").text())
+        const hasCi = !!(pkg.scripts && Object.prototype.hasOwnProperty.call(pkg.scripts, "ci"))
+        process.stdout.write(hasCi ? "run" : "skip")
+    ') || {
+        log_error "Failed to read or parse package.json (is bun working?)"
+        exit 1
+    }
+
+    if [ "$CI_MODE" = run ]; then
+        echo "[BUILD] --- Running \`bun run ci\`..."
+        bun run ci
+    else
+        log_info "No \`ci\` script in package.json; skipping \`bun run ci\`."
+    fi
 
     echo "[BUILD] Waiting for generated output folder to be created..."
     while [ ! -d "${APP_OUTPUT}" ]; do
