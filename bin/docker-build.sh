@@ -132,18 +132,20 @@ if [ "$BUILD_NEEDED" = true ]; then
         npm install -g bun
     fi
 
-    if [ ! -f package.json ]; then
-        log_error "package.json not found in $(pwd)"
+    PACKAGE_JSON_PATH="${GITHUB_REPO}/package.json"
+    if [ ! -f "${PACKAGE_JSON_PATH}" ]; then
+        log_error "package.json not found at ${PACKAGE_JSON_PATH}"
         exit 1
     fi
 
-    # Skip `bun run ci` when package.json has no scripts.ci entry (otherwise it exits non‑zero).
-    CI_MODE=$(bun -e '
-        const pkg = JSON.parse(await Bun.file("package.json").text())
+    # Skip `bun run ci` when package.json has no scripts.ci entry (otherwise it exits non-zero).
+    CI_MODE=$(PACKAGE_JSON_PATH="${PACKAGE_JSON_PATH}" bun -e '
+        const pkgPath = process.env.PACKAGE_JSON_PATH
+        const pkg = JSON.parse(await Bun.file(pkgPath).text())
         const hasCi = !!(pkg.scripts && Object.prototype.hasOwnProperty.call(pkg.scripts, "ci"))
         process.stdout.write(hasCi ? "run" : "skip")
     ') || {
-        log_error "Failed to read or parse package.json (is bun working?)"
+        log_error "Failed to read or parse ${PACKAGE_JSON_PATH} (is bun working?)"
         exit 1
     }
 
