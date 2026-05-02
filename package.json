@@ -1,0 +1,13 @@
+{
+  "name": "dockerized-nuxt-orchestrator",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "bun run src/index.ts",
+    "typecheck": "bun x tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/bun": "1.2.16",
+    "typescript": "5.8.3"
+  }
+}

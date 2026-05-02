@@ -1,12 +1,12 @@
 # Use Node.js 22 Alpine as base image
-FROM node:22-alpine AS base
+FROM node:22-alpine
 
 # Environment variables #1
 ENV CI=1
 ENV BETTER_AUTH_TELEMETRY=0
 ENV BETTER_AUTH_TELEMETRY_DEBUG=0
 
-# Environment variables #2
+# Environment variables #2 (runtime Git/app paths — cloned repo and flags live under APP_ROOT)
 ENV APP_ROOT="/app"
 ENV GITHUB_REPO="/app"
 ENV APP_BUILD="${GITHUB_REPO}/.output"
@@ -16,36 +16,24 @@ ENV LAST_COMMIT_FILE="${APP_ROOT}/.last_commit"
 ENV BUILD_COMPLETE_FLAG="${APP_ROOT}/.build-complete.flag"
 ENV PROJECT_BUILD_SCRIPT="${GITHUB_REPO}/scripts/build.sh"
 
-# Install git, wget, supervisor, and rsync
-RUN apk add --no-cache git wget supervisor rsync
+# Admin HTTP (orchestrator dashboard). Use ADMIN_TOKEN when exposing a port.
+ENV ADMIN_BIND="0.0.0.0"
+ENV ADMIN_PORT="9090"
 
-# Set working directory
-WORKDIR ${APP_ROOT}
+# Install git, wget, rsync (git for clone; wget for compose healthcheck)
+RUN apk add --no-cache git wget rsync
 
-# Install pnpm
-RUN npm install -g bun pnpm nodemon
-# > Use PNPM STORAGE CACHE: /root/.local/share/pnpm
-# > Use BUN STORAGE CACHE: /root/.bun/install/cache
+# Bun + nodemon for cloned app build/run
+RUN npm install -g bun nodemon
 
-# --- SCRIPTS ---
-FROM base AS scripts
+WORKDIR /opt/orchestrator
 
-# Copy all scripts
-COPY bin/ /usr/local/bin/
-# Make all scripts executable
-RUN chmod +x /usr/local/bin/*
+COPY package.json bun.lock tsconfig.json ./
+COPY src ./src
 
-# Copy supervisord configuration
-COPY conf.d/supervisord.conf /etc/supervisord.conf
+RUN bun install --frozen-lockfile
 
-# Create log directory
-RUN mkdir -p /var/log/supervisor
-
-# --- FINAL ---
-FROM scripts AS final
-
-# Expose port 3000
 EXPOSE 3000
+EXPOSE 9090
 
-# Start supervisord
-CMD ["/usr/bin/supervisord", "-c", "/etc/supervisord.conf"]
+CMD ["bun", "run", "start"]

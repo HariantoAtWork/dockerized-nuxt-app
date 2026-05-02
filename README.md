@@ -1,13 +1,13 @@
 # Nuxt.js Docker Application
 
-A containerised Nuxt.js application with automated Git-based deployment, continuous monitoring, and intelligent build management using Docker Compose and Supervisor.
+A containerised Nuxt.js application with automated Git-based deployment, continuous monitoring, and intelligent build management using Docker Compose and a **Bun/TypeScript orchestrator** (no Supervisor).
 
 ## 🚀 Features
 
 - **Automated Git Deployment**: Automatically clones and updates from GitHub repositories
-- **Smart Build Management**: Only rebuilds when new commits are detected
+- **Smart Build Management**: Only rebuilds when new commits are detected (or when output is missing)
 - **Continuous Monitoring**: Watches for repository changes and triggers automatic rebuilds
-- **Process Management**: Uses Supervisor to manage multiple processes (build, app, watcher)
+- **Process Management**: Single orchestrator manages Git sync, install/build, nodemon runtime, and polling
 - **Persistent Storage**: Maintains application data and build cache across container restarts
 - **Health Checks**: Built-in health monitoring for the application
 - **Development & Production**: Separate configurations for development and production environments
@@ -66,42 +66,31 @@ The application will be available at `http://localhost:3300`
 
 ### Container Structure
 
-The application uses a multi-stage Docker build with the following components:
+The image bundles:
 
 - **Base Image**: Node.js 22 Alpine
-- **Package Managers**: Bun (primary), pnpm (alternative)
-- **Process Manager**: Supervisor
-- **File Watcher**: nodemon
+- **Orchestrator**: Bun + TypeScript (`/opt/orchestrator`) — Git sync, build, admin HTTP API
+- **Package managers**: Bun for the cloned app (`bun install`, `bun run ci` / `bun run build`)
+- **Runtime**: nodemon watching `.output` and running `.output/server/index.mjs`
 
-### Process Management
+### Process flow
 
-Supervisor manages three main processes:
+1. **Git sync** — clone or fetch `origin/<GIT_BRANCH>` (default `main`), recover broken `.git`, force-reset when the remote moves.
+2. **Build** — `bun install`, then `bun run ci` if `scripts.ci` exists; otherwise `bun run build` if `scripts.build` exists (your app must define at least one).
+3. **Serve** — wait for `/app/.build-complete.flag` and `.output/server/index.mjs`, then start nodemon from `/app`.
+4. **Watch** — poll Git on `WATCH_INTERVAL_MS` (default 60s); on new commits, rebuild and restart nodemon.
 
-1. **Build Process** (`docker-build.sh`)
-   - Clones/updates the Git repository
-   - Installs dependencies using Bun (primary package manager)
-   - Builds the Nuxt.js application
-   - Manages build state and completion flags
-
-2. **Application Process** (`docker-run.sh`)
-   - Waits for build completion
-   - Starts the Nuxt.js server
-   - Uses nodemon for development file watching
-
-3. **Watcher Process** (`docker-watch.sh`)
-   - Monitors repository for new commits
-   - Triggers automatic rebuilds when changes are detected
-   - Manages application restarts
-
-### Directory Structure
+### Directory layout
 
 ```
-/app/                    # Application root
-├── .output/            # Built application output
-├── .current_commit     # Current commit hash
-├── .last_commit        # Latest commit hash
-├── .build-complete.flag # Build completion flag
-└── [repository]/      # Cloned Git repository
+/opt/orchestrator/       # Orchestrator package (image layer)
+/app/                    # Mounted volume: cloned repo + Nuxt build output
+├── .output/             # Built application output
+├── .current_commit      # Current commit hash (record)
+├── .last_commit         # Remote tip record
+├── .build-complete.flag # Orchestrator signals “safe to run server”
+├── package.json         # Cloned application
+└── …
 ```
 
 ## 🔧 Configuration
@@ -114,6 +103,11 @@ Supervisor manages three main processes:
 | `GITHUB_REPO_URL` | GitHub repository URL with token | Yes |
 | `DOCKER_HUB_IMAGE` | Docker image for production | Production only |
 | `VERBOSE_LOGGING` | Enable verbose logging (true/false) | No (default: true) |
+| `GIT_BRANCH` | Remote branch name (`origin/<branch>`) | No (default: `main`) |
+| `ADMIN_BIND` | Orchestrator admin HTTP bind address | No (default: `0.0.0.0`) |
+| `ADMIN_PORT` | Orchestrator admin HTTP port | No (default: `9090`) |
+| `ADMIN_TOKEN` | If set, required for `POST /api/rebuild` and `POST /api/restart-app` | No |
+| `WATCH_INTERVAL_MS` | Git poll interval for updates | No (default: `60000`) |
 
 #### Application Environment (`.env.app`)
 | Variable | Description | Required |
@@ -132,36 +126,14 @@ Supervisor manages three main processes:
 
 ### Port Configuration
 
-- **Container**: 3000 (internal)
-- **Host**: 3300 (external)
+- **Nuxt (HTTP)**: container `3000` → host `3300`
+- **Orchestrator admin**: container `9090` → host `127.0.0.1:9091` (see `docker-compose.yml`; bind orchestrator with `ADMIN_BIND`/`ADMIN_PORT`)
 
-## 📝 Scripts
+Open **http://127.0.0.1:9091/** on the host for the dashboard (when compose publishes `9091:9090`). Set `ADMIN_TOKEN` and send `Authorization: Bearer <token>` (or `?token=` on the dashboard URL) for rebuild/restart actions.
 
-### Build Script (`docker-build.sh`)
+## 📝 Orchestrator source
 
-Handles repository cloning, dependency installation, and application building:
-
-- Smart repository recovery for corrupted `.git` directories
-- Force pull support for handling `git push -f` scenarios
-- Incremental builds (only when new commits detected)
-- Build state management with completion flags
-
-### Run Script (`docker-run.sh`)
-
-Manages application startup:
-
-- Waits for build completion
-- Starts the Nuxt.js server
-- Uses nodemon for development file watching
-
-### Watch Script (`docker-watch.sh`)
-
-Monitors repository changes:
-
-- Checks for new commits every minute
-- Triggers automatic rebuilds
-- Manages application restarts
-- Handles supervisord readiness checks
+Implementation lives in [`src/`](src/) (TypeScript, run with Bun). Entry: [`src/index.ts`](src/index.ts).
 
 ## 🚀 Deployment
 
@@ -203,29 +175,22 @@ docker inspect nuxt-app_nuxt-app_1 | grep -A 10 Health
 
 ## 🔍 Monitoring & Logs
 
-### Supervisor Logs
+### Container logs
 
 ```bash
-# View all supervisor logs
-docker-compose exec nuxt-app tail -f /var/log/supervisor/supervisord.log
-
-# View specific process logs
-docker-compose exec nuxt-app tail -f /var/log/supervisor/build.log
-docker-compose exec nuxt-app tail -f /var/log/supervisor/app.log
-docker-compose exec nuxt-app tail -f /var/log/supervisor/watcher.log
+docker compose logs -f nuxt-app
 ```
 
-### Process Management
+The orchestrator prints prefixed lines to stdout; nodemon output appears there while the app runs.
+
+### Admin API
 
 ```bash
-# Check supervisor status
-docker-compose exec nuxt-app supervisorctl status
-
-# Restart specific process
-docker-compose exec nuxt-app supervisorctl restart app
-
-# Restart all processes
-docker-compose exec nuxt-app supervisorctl restart all
+curl -s http://127.0.0.1:9091/api/status
+curl -s http://127.0.0.1:9091/api/logs?n=80
+# With ADMIN_TOKEN set:
+curl -s -X POST -H "Authorization: Bearer $ADMIN_TOKEN" http://127.0.0.1:9091/api/rebuild
+curl -s -X POST -H "Authorization: Bearer $ADMIN_TOKEN" http://127.0.0.1:9091/api/restart-app
 ```
 
 ## 🛠️ Troubleshooting
@@ -240,38 +205,31 @@ docker-compose exec nuxt-app supervisorctl restart all
 
 2. **Build Failures**
    ```bash
-   # Check build logs
-   docker-compose exec nuxt-app tail -f /var/log/supervisor/build.log
+   docker compose logs -f nuxt-app
    ```
+   Ensure `package.json` defines `scripts.ci` and/or `scripts.build`.
 
 3. **Application Not Starting**
    ```bash
-   # Check if build completed
-   docker-compose exec nuxt-app ls -la /app/.build-complete.flag
-   
-   # Check app logs
-   docker-compose exec nuxt-app tail -f /var/log/supervisor/app.log
+   docker compose exec nuxt-app ls -la /app/.build-complete.flag
+   docker compose exec nuxt-app ls -la /app/.output/server/index.mjs
    ```
 
-4. **Watcher Not Working**
+4. **Watcher / rebuild loop**
    ```bash
-   # Check watcher logs
-   docker-compose exec nuxt-app tail -f /var/log/supervisor/watcher.log
-   
-   # Check supervisor status
-   docker-compose exec nuxt-app supervisorctl status
+   curl -s http://127.0.0.1:9091/api/status
    ```
+   Confirm `GIT_BRANCH` matches your default branch.
 
 ### Manual Operations
 
 ```bash
-# Force rebuild
-docker-compose exec nuxt-app supervisorctl restart build
+# Force rebuild via orchestrator (requires ADMIN_TOKEN if configured)
+curl -X POST -H "Authorization: Bearer $ADMIN_TOKEN" http://127.0.0.1:9091/api/rebuild
 
-# Manual repository update
-docker-compose exec nuxt-app bash
-cd /app/[repository]
-git pull origin main
+# Shell inside container
+docker compose exec nuxt-app sh
+cd /app && git status
 ```
 
 ## 📚 Development
@@ -283,9 +241,9 @@ git pull origin main
 3. The watcher will automatically detect changes and rebuild
 4. Monitor logs to ensure successful deployment
 
-### Custom Build Scripts
+### Build expectations
 
-The system expects a `scripts/build.sh` file in your repository for custom build processes.
+The cloned app must expose **`scripts.ci` and/or `scripts.build`** in `package.json`. The orchestrator runs `bun install` before either script.
 
 ## 🤝 Contributing
 
@@ -310,4 +268,4 @@ For support and questions:
 
 ---
 
-**Last Updated**: 2025-09-09T15:11:14+0200
+**Last Updated**: 2026-05-03T01:42:02+0200

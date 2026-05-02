@@ -14,6 +14,8 @@ services:
       dockerfile: Dockerfile
     ports:
       - "3300:3000"
+      # Orchestrator admin UI (set ADMIN_TOKEN in production). Host-only bind recommended.
+      - "127.0.0.1:9091:9090"
     environment:
       - NODE_ENV=production
       - GITHUB_REPO_URL=${GITHUB_REPO_URL}
