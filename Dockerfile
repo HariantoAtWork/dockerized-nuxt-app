@@ -1,4 +1,12 @@
-# Use Node.js 22 Alpine as base image
+# --- Vue admin UI (Vite build → copied to /opt/orchestrator/static) ---
+FROM node:22-alpine AS admin-ui-build
+RUN npm install -g bun
+WORKDIR /build
+COPY admin-ui ./admin-ui
+WORKDIR /build/admin-ui
+RUN bun install --frozen-lockfile && bun run build
+
+# --- Runtime image ---
 FROM node:22-alpine
 
 # Environment variables #1
@@ -30,6 +38,7 @@ WORKDIR /opt/orchestrator
 
 COPY package.json bun.lock tsconfig.json ./
 COPY src ./src
+COPY --from=admin-ui-build /build/admin-ui/dist ./static
 
 RUN bun install --frozen-lockfile
 

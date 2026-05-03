@@ -131,9 +131,26 @@ The image bundles:
 
 Open **http://127.0.0.1:9091/** on the host for the dashboard (when compose publishes `9091:9090`). Set `ADMIN_TOKEN` and send `Authorization: Bearer <token>` (or `?token=` on the dashboard URL) for rebuild/restart actions.
 
-## 📝 Orchestrator source
+## 📝 Orchestrator source & Vue admin UI
 
-Implementation lives in [`src/`](src/) (TypeScript, run with Bun). Entry: [`src/index.ts`](src/index.ts).
+- **Orchestrator** (TypeScript/Bun): [`src/`](src/), entry [`src/index.ts`](src/index.ts). JSON APIs: `/api/status`, `/api/logs`, `POST /api/rebuild`, `POST /api/restart-app`.
+- **Dashboard** (Vue 3 + Vite): [`admin-ui/`](admin-ui/). The production bundle is built into `admin-ui/dist` and served by Bun from `static/` at the repo root.
+
+From the repository root, regenerate `static/` after UI changes:
+
+```bash
+bun run build:admin
+```
+
+The Docker image builds the Vue app in a multi-stage layer and copies it to `/opt/orchestrator/static`, so you do not need `static/` checked into Git.
+
+Develop the dashboard with Vite (proxies `/api` → `http://127.0.0.1:9090`):
+
+```bash
+cd admin-ui && bun run dev
+```
+
+Run the orchestrator in another terminal (`bun run start`) so the admin server is listening for API and static requests.
 
 ## 🚀 Deployment
 

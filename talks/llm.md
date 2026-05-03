@@ -25,7 +25,8 @@ This repository ships a Docker image whose purpose is to clone or update a Git-h
 ## Admin dashboard
 
 - HTTP server on `ADMIN_BIND`:`ADMIN_PORT` (defaults `0.0.0.0:9090`). Compose can publish `127.0.0.1:9091:9090` on the host.
-- Routes: `GET /`, `GET /api/status`, `GET /api/logs`, `POST /api/rebuild`, `POST /api/restart-app`.
+- **UI**: Vue 3 + Vite app in `admin-ui/`; production build copied to `static/` (or baked into the image at `/opt/orchestrator/static`). Bun serves `index.html`, hashed JS/CSS assets, and SPA fallback for client routes.
+- JSON routes: `GET /api/status`, `GET /api/logs`, `POST /api/rebuild`, `POST /api/restart-app`.
 - If `ADMIN_TOKEN` is set, POST endpoints require `Authorization: Bearer <token>` or `?token=` on the dashboard URL.
 
 ## Observability

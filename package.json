@@ -4,7 +4,8 @@
   "type": "module",
   "scripts": {
     "start": "bun run src/index.ts",
-    "typecheck": "bun x tsc --noEmit"
+    "typecheck": "bun x tsc --noEmit",
+    "build:admin": "cd admin-ui && bun run build && rm -rf ../static && cp -r dist ../static"
   },
   "devDependencies": {
     "@types/bun": "1.2.16",
