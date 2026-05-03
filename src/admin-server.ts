@@ -40,6 +40,33 @@ function dashboardHtml() {
     pre { padding: 1rem; overflow: auto; }
     button { margin-right: 0.5rem; margin-top: 0.5rem; }
     .err { color: #b91c1c; }
+    #toast-host {
+      position: fixed;
+      bottom: 1rem;
+      right: 1rem;
+      z-index: 9999;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      align-items: flex-end;
+      pointer-events: none;
+    }
+    .toast {
+      max-width: 22rem;
+      padding: 0.65rem 1rem;
+      border-radius: 8px;
+      box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
+      font-size: 0.9rem;
+      line-height: 1.35;
+      opacity: 0;
+      transform: translateY(10px);
+      transition: opacity 0.28s ease, transform 0.28s ease;
+      pointer-events: auto;
+    }
+    .toast-visible { opacity: 1; transform: translateY(0); }
+    .toast-success { background: #ecfdf5; color: #065f46; border: 1px solid #a7f3d0; }
+    .toast-error { background: #fef2f2; color: #991b1b; border: 1px solid #fecaca; }
+    .toast-info { background: #eff6ff; color: #1e40af; border: 1px solid #bfdbfe; }
   </style>
 </head>
 <body>
@@ -51,8 +78,22 @@ function dashboardHtml() {
   <button type="button" id="restart">Restart app</button>
   <h2>Recent logs</h2>
   <pre id="logs"></pre>
+  <div id="toast-host" aria-live="polite"></div>
   <script>
     const token = new URLSearchParams(location.search).get('token') || '';
+    function showToast(message, variant) {
+      const host = document.getElementById('toast-host');
+      const el = document.createElement('div');
+      el.className = 'toast toast-' + (variant || 'info');
+      el.textContent = message;
+      host.appendChild(el);
+      requestAnimationFrame(() => el.classList.add('toast-visible'));
+      const dismissMs = variant === 'error' ? 7000 : 4500;
+      setTimeout(() => {
+        el.classList.remove('toast-visible');
+        setTimeout(() => el.remove(), 320);
+      }, dismissMs);
+    }
     async function api(path, opts = {}) {
       const headers = { ...(opts.headers || {}) };
       if (token) headers['Authorization'] = 'Bearer ' + token;
@@ -60,36 +101,50 @@ function dashboardHtml() {
       if (!r.ok) throw new Error(await r.text());
       return r.json();
     }
-    async function refresh() {
+    async function refresh(opts) {
+      const silent = opts && opts.silent;
+      let ok = true;
       try {
         const s = await api('/api/status');
         document.getElementById('status').innerHTML =
           '<pre>' + JSON.stringify(s, null, 2) + '</pre>';
       } catch (e) {
+        ok = false;
         document.getElementById('status').innerHTML = '<p class="err">' + e.message + '</p>';
+        if (!silent) showToast(e.message, 'error');
       }
       try {
         const l = await api('/api/logs?n=120');
         document.getElementById('logs').textContent = l.lines.join('\\n');
       } catch (e) {
+        ok = false;
         document.getElementById('logs').textContent = String(e);
       }
+      return ok;
     }
-    document.getElementById('reload').onclick = refresh;
+    document.getElementById('reload').onclick = async () => {
+      if (await refresh({})) showToast('Status refreshed', 'success');
+    };
     document.getElementById('rebuild').onclick = async () => {
       try {
         await api('/api/rebuild', { method: 'POST' });
+        showToast('Rebuild finished', 'success');
         await refresh();
-      } catch (e) { alert(e.message); }
+      } catch (e) {
+        showToast(e.message || String(e), 'error');
+      }
     };
     document.getElementById('restart').onclick = async () => {
       try {
         await api('/api/restart-app', { method: 'POST' });
+        showToast('App restarted', 'success');
         await refresh();
-      } catch (e) { alert(e.message); }
+      } catch (e) {
+        showToast(e.message || String(e), 'error');
+      }
     };
-    refresh();
-    setInterval(refresh, 10000);
+    refresh({});
+    setInterval(() => { refresh({ silent: true }); }, 10000);
   </script>
 </body>
 </html>`;
