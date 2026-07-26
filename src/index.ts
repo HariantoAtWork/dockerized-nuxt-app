@@ -73,6 +73,7 @@ async function main() {
   }
 
   function getSnapshot(): OrchestratorSnapshot {
+    const serverEntryPath = `${cfg.appOutput}/server/index.mjs`;
     return {
       phase,
       gitBranch: cfg.gitBranch,
@@ -81,6 +82,8 @@ async function main() {
       remoteCommit: readCommitFile(cfg.lastCommitFile),
       appRunning: app.isRunning(),
       appPid: app.getPid(),
+      serverEntryExists: isFile(serverEntryPath),
+      serverEntryPath,
       lastBuildAt,
       lastError,
       watchIntervalMs: cfg.watchIntervalMs,

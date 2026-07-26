@@ -8,6 +8,8 @@ export type OrchestratorSnapshot = {
   remoteCommit: string | null;
   appRunning: boolean;
   appPid: number | null;
+  serverEntryExists: boolean;
+  serverEntryPath: string;
   lastBuildAt: string | null;
   lastError: string | null;
   watchIntervalMs: number;
