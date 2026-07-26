@@ -31,8 +31,8 @@ ENV ADMIN_PORT="9090"
 # Install git, wget, rsync (git for clone; wget for compose healthcheck)
 RUN apk add --no-cache git wget rsync
 
-# Bun + nodemon for cloned app build/run
-RUN npm install -g bun nodemon
+# Bun for cloned app build/run (bun --watch restarts .output/server/index.mjs)
+RUN npm install -g bun
 
 WORKDIR /opt/orchestrator
 

@@ -38,16 +38,9 @@ export function createAppRunner(cfg: AppConfig, log: RingLog): AppRunner {
 
     start: async () => {
       await stopQuiet();
-      log.info("Starting nodemon for Nuxt server...");
+      log.info("Starting bun --watch for Nuxt server...");
       child = Bun.spawn(
-        [
-          "nodemon",
-          "--watch",
-          cfg.appOutput,
-          "--cwd",
-          cfg.appRoot,
-          ".output/server/index.mjs",
-        ],
+        ["bun", "--watch", ".output/server/index.mjs"],
         {
           cwd: cfg.appRoot,
           stdout: "inherit",
