@@ -1,6 +1,9 @@
 # --- Vue admin UI (Vite build → copied to /opt/orchestrator/static) ---
 FROM node:22-alpine AS admin-ui-build
-RUN npm install -g bun
+RUN apk add --no-cache curl bash unzip \
+  && curl -fsSL https://bun.com/install | bash \
+  && ln -sf /root/.bun/bin/bun /usr/local/bin/bun \
+  && bun upgrade --canary
 WORKDIR /build
 COPY admin-ui ./admin-ui
 WORKDIR /build/admin-ui
@@ -28,11 +31,12 @@ ENV PROJECT_BUILD_SCRIPT="${GITHUB_REPO}/scripts/build.sh"
 ENV ADMIN_BIND="0.0.0.0"
 ENV ADMIN_PORT="9090"
 
-# Install git, wget, rsync (git for clone; wget for compose healthcheck)
-RUN apk add --no-cache git wget rsync
-
-# Bun for cloned app build/run (bun --watch restarts .output/server/index.mjs)
-RUN npm install -g bun
+# git/rsync for clone; wget for healthcheck; curl/bash/unzip for official Bun install
+# Bun runs the cloned app (bun --watch restarts .output/server/index.mjs)
+RUN apk add --no-cache git wget rsync curl bash unzip \
+  && curl -fsSL https://bun.com/install | bash \
+  && ln -sf /root/.bun/bin/bun /usr/local/bin/bun \
+  && bun upgrade --canary
 
 WORKDIR /opt/orchestrator
 
