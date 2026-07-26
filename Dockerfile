@@ -32,11 +32,12 @@ ENV ADMIN_BIND="0.0.0.0"
 ENV ADMIN_PORT="9090"
 
 # git/rsync for clone; wget for healthcheck; curl/bash/unzip for official Bun install
-# Bun runs the cloned app (bun --watch restarts .output/server/index.mjs)
+# nodemon watches .output and runs .output/server/index.mjs
 RUN apk add --no-cache git wget rsync curl bash unzip \
   && curl -fsSL https://bun.com/install | bash \
   && ln -sf /root/.bun/bin/bun /usr/local/bin/bun \
-  && bun upgrade --canary
+  && bun upgrade --canary \
+  && npm install -g nodemon
 
 WORKDIR /opt/orchestrator
 

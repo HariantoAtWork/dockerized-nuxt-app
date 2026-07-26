@@ -1,4 +1,5 @@
 import type { AppConfig } from "./config.ts";
+import { isFile } from "./fs-utils.ts";
 import type { RingLog } from "./logger.ts";
 
 export type AppRunner = {
@@ -7,6 +8,8 @@ export type AppRunner = {
   isRunning: () => boolean;
   getPid: () => number | null;
 };
+
+const SERVER_ENTRY = ".output/server/index.mjs";
 
 export function createAppRunner(cfg: AppConfig, log: RingLog): AppRunner {
   let child: ReturnType<typeof Bun.spawn> | null = null;
@@ -17,6 +20,10 @@ export function createAppRunner(cfg: AppConfig, log: RingLog): AppRunner {
     child = null;
     try {
       c.kill();
+    } catch {
+      /* ignore */
+    }
+    try {
       await Promise.race([
         c.exited,
         Bun.sleep(8000).then(() => {
@@ -32,15 +39,32 @@ export function createAppRunner(cfg: AppConfig, log: RingLog): AppRunner {
     }
   }
 
+  async function waitForServerEntry(): Promise<void> {
+    const absoluteEntry = `${cfg.appOutput}/server/index.mjs`;
+    if (isFile(absoluteEntry)) return;
+    log.info(`Waiting for ${SERVER_ENTRY} before nodemon...`);
+    while (!isFile(absoluteEntry)) {
+      await Bun.sleep(2000);
+    }
+  }
+
   return {
     isRunning: () => child !== null,
     getPid: () => child?.pid ?? null,
 
     start: async () => {
       await stopQuiet();
-      log.info("Starting bun --watch for Nuxt server...");
+      await waitForServerEntry();
+      log.info(`Starting nodemon for ${SERVER_ENTRY}...`);
       child = Bun.spawn(
-        ["bun", "--watch", ".output/server/index.mjs"],
+        [
+          "nodemon",
+          "--watch",
+          cfg.appOutput,
+          "--cwd",
+          cfg.appRoot,
+          SERVER_ENTRY,
+        ],
         {
           cwd: cfg.appRoot,
           stdout: "inherit",
