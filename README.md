@@ -1,288 +1,161 @@
 # Nuxt.js Docker Application
 
-A containerised Nuxt.js application with automated Git-based deployment, continuous monitoring, and intelligent build management using Docker Compose and a **Bun/TypeScript orchestrator** (no Supervisor).
+A containerised Nuxt.js application with automated Git-based deployment, continuous monitoring, and build management using Docker Compose and a **Bun/TypeScript orchestrator** (no Supervisor).
 
-## 🚀 Features
+Deeper operational docs live in [`.wiki/`](.wiki/Home.md).
 
-- **Automated Git Deployment**: Automatically clones and updates from GitHub repositories
-- **Smart Build Management**: Only rebuilds when new commits are detected (or when output is missing)
-- **Continuous Monitoring**: Watches for repository changes and triggers automatic rebuilds
-- **Process Management**: Single orchestrator manages Git sync, install/build, nodemon runtime, and polling
-- **Persistent Storage**: Maintains application data and build cache across container restarts
-- **Health Checks**: Built-in health monitoring for the application
-- **Development & Production**: Separate configurations for development and production environments
+## Features
 
-## 📋 Prerequisites
+- **Automated Git deployment** — clone/update from GitHub, including on-the-fly **branch switch** from the admin UI
+- **Smart builds** — rebuild when commits move (or output is missing): `bun install` + `bun run ci` / `bun run build`
+- **Process supervision** — nodemon watches `.output` and runs `.output/server/index.mjs` (gated until the entry exists)
+- **Admin dashboard** — runtime signals (build entry + nodemon), branch deploy, logs, rebuild/restart
+- **Separated volumes** — `/app` clone, `/data` Nuxt app data, `/var/lib/orchestrator` CI state
+- **Health checks** — compose healthcheck on port 3000
+
+## Prerequisites
 
 - Docker and Docker Compose
 - Git access to your Nuxt.js repository
 - GitHub Personal Access Token (for private repositories)
 
-## 🛠️ Quick Start
+## Quick start
 
-### 1. Environment Setup
+### 1. Environment
 
-Create a `.env` file for Docker environment variables:
+Create a `.env` file:
 
 ```bash
-# Docker environment variables
 GITHUB_REPO_URL=https://YOUR_TOKEN@github.com/username/repository.git
 DOCKER_HUB_IMAGE=your-registry/nuxt-app:latest
-
-# Logging Configuration
-VERBOSE_LOGGING=true  # Set to false to disable verbose logging (only show errors)
+VERBOSE_LOGGING=true
+# GIT_BRANCH=main
+# ADMIN_TOKEN=
 ```
 
-Create a `.env.app` file for application-specific environment variables:
+Create a `.env.app` file for the cloned Nuxt app:
 
 ```bash
-# Application environment variables
 NODE_ENV=production
-# Add your Nuxt.js app-specific variables here
-# e.g., API_URL, DATABASE_URL, etc.
+# Nuxt-specific vars; keep app data under /data
 ```
 
-### 2. Create Required Volumes
+### 2. Cache volumes
 
 ```bash
-# Create external volumes for caching
 docker volume create bun-cache
 docker volume create pnpm-store
 ```
 
-### 3. Start the Application
+### 3. Start
 
 ```bash
-# Development
-docker-compose up -d
+# Development (builds local Dockerfile)
+docker compose up -d
 
-# Production
-docker-compose -f docker-compose.production.yml up -d
+# Production (pulls DOCKER_HUB_IMAGE)
+docker compose -f docker-compose.production.yml up -d
 ```
 
-The application will be available at `http://localhost:3300`
+- App: `http://localhost:3300`
+- Admin: `http://127.0.0.1:9091/`
 
-## 🏗️ Architecture
+## Architecture (summary)
 
-### Container Structure
+| Path | Role |
+|------|------|
+| `/opt/orchestrator` | Orchestrator + static admin UI (image) |
+| `/app` | Cloned repo + `.output` (`./data/app`) |
+| `/data` | Reserved for Nuxt app data (`./data/data`) |
+| `/var/lib/orchestrator` | CI state: branch, commits, build flag (`./data/orchestrator`) |
 
-The image bundles:
+**Flow:** git sync → `bun install` + `ci`/`build` → wait for build flag + `index.mjs` → nodemon → poll active branch.
 
-- **Base Image**: Node.js 22 Alpine
-- **Orchestrator**: Bun + TypeScript (`/opt/orchestrator`) — Git sync, build, admin HTTP API
-- **Package managers**: Bun for the cloned app (`bun install`, `bun run ci` / `bun run build`)
-- **Runtime**: nodemon watching `.output` and running `.output/server/index.mjs`
+Bun is installed via the official install script and upgraded to **canary** in the image. Nodemon remains the server supervisor (not `bun --watch`).
 
-### Process flow
+See [.wiki/Architecture.md](.wiki/Architecture.md) and [.wiki/Volumes-and-paths.md](.wiki/Volumes-and-paths.md).
 
-1. **Git sync** — clone or fetch `origin/<GIT_BRANCH>` (default `main`), recover broken `.git`, force-reset when the remote moves.
-2. **Build** — `bun install`, then `bun run ci` if `scripts.ci` exists; otherwise `bun run build` if `scripts.build` exists (your app must define at least one).
-3. **Serve** — wait for `/app/.build-complete.flag` and `.output/server/index.mjs`, then start nodemon from `/app`.
-4. **Watch** — poll Git on `WATCH_INTERVAL_MS` (default 60s); on new commits, rebuild and restart nodemon.
+## Configuration
 
-### Directory layout
-
-```
-/opt/orchestrator/       # Orchestrator package (image layer)
-/app/                    # Mounted volume: cloned repo + Nuxt build output
-├── .output/             # Built application output
-├── .current_commit      # Current commit hash (record)
-├── .last_commit         # Remote tip record
-├── .build-complete.flag # Orchestrator signals “safe to run server”
-├── package.json         # Cloned application
-└── …
-```
-
-## 🔧 Configuration
-
-### Environment Variables
-
-#### Docker Environment (`.env`)
 | Variable | Description | Required |
 |----------|-------------|----------|
-| `GITHUB_REPO_URL` | GitHub repository URL with token | Yes |
-| `DOCKER_HUB_IMAGE` | Docker image for production | Production only |
-| `VERBOSE_LOGGING` | Enable verbose logging (true/false) | No (default: true) |
-| `GIT_BRANCH` | Remote branch name (`origin/<branch>`) | No (default: `main`) |
-| `ADMIN_BIND` | Orchestrator admin HTTP bind address | No (default: `0.0.0.0`) |
-| `ADMIN_PORT` | Orchestrator admin HTTP port | No (default: `9090`) |
-| `ADMIN_TOKEN` | If set, required for `POST /api/rebuild` and `POST /api/restart-app` | No |
-| `WATCH_INTERVAL_MS` | Git poll interval for updates | No (default: `60000`) |
+| `GITHUB_REPO_URL` | Repo URL (with token if private) | Yes |
+| `DOCKER_HUB_IMAGE` | Image name for production compose | Production |
+| `GIT_BRANCH` | Initial branch if none persisted | No (`main`) |
+| `ORCHESTRATOR_STATE_DIR` | CI state directory | No (`/var/lib/orchestrator`) |
+| `ADMIN_TOKEN` | Protects rebuild / restart / branch switch | No |
+| `WATCH_INTERVAL_MS` | Git poll interval | No (`60000`) |
+| `VERBOSE_LOGGING` | Verbose orchestrator logs | No (`true`) |
 
-#### Application Environment (`.env.app`)
-| Variable | Description | Required |
-|----------|-------------|----------|
-| `NODE_ENV` | Node.js environment | Yes |
-| `API_URL` | API endpoint URL | Optional |
-| `DATABASE_URL` | Database connection string | Optional |
-| `SECRET_KEY` | Application secret key | Optional |
+Full list: [.wiki/Configuration.md](.wiki/Configuration.md).
 
-### Volume Mounts
+### Volumes
 
-- `./data/app:/app` - Application data persistence
-- `./data/data:/data` - Additional data storage
-- `bun-cache:/root/.bun/install/cache` - Bun cache (primary)
-- `pnpm-store:/root/.local/share/pnpm` - pnpm cache (alternative)
+- `./data/app:/app` — clone + build output
+- `./data/data:/data` — Nuxt application data only
+- `./data/orchestrator:/var/lib/orchestrator` — orchestrator CI state
+- `bun-cache`, `pnpm-store` — package caches
 
-### Port Configuration
+## Admin UI & API
 
-- **Nuxt (HTTP)**: container `3000` → host `3300`
-- **Orchestrator admin**: container `9090` → host `127.0.0.1:9091` (see `docker-compose.yml`; bind orchestrator with `ADMIN_BIND`/`ADMIN_PORT`)
-
-Open **http://127.0.0.1:9091/** on the host for the dashboard (when compose publishes `9091:9090`). Set `ADMIN_TOKEN` and send `Authorization: Bearer <token>` (or `?token=` on the dashboard URL) for rebuild/restart actions.
-
-## 📝 Orchestrator source & Vue admin UI
-
-- **Orchestrator** (TypeScript/Bun): [`src/`](src/), entry [`src/index.ts`](src/index.ts). JSON APIs: `/api/status`, `/api/logs`, `POST /api/rebuild`, `POST /api/restart-app`.
-- **Dashboard** (Vue 3 + Vite): [`admin-ui/`](admin-ui/). The production bundle is built into `admin-ui/dist` and served by Bun from `static/` at the repo root.
-
-From the repository root, regenerate `static/` after UI changes:
-
-```bash
-bun run build:admin
-```
-
-The Docker image builds the Vue app in a multi-stage layer and copies it to `/opt/orchestrator/static`, so you do not need `static/` checked into Git.
-
-Develop the dashboard with Vite (proxies `/api` → `http://127.0.0.1:9090`):
-
-```bash
-cd admin-ui && bun run dev
-```
-
-Run the orchestrator in another terminal (`bun run start`) so the admin server is listening for API and static requests.
-
-## 🚀 Deployment
-
-### Development Deployment
-
-```bash
-# Start development environment
-docker-compose up -d
-
-# View logs
-docker-compose logs -f
-
-# Stop environment
-docker-compose down
-```
-
-### Production Deployment
-
-```bash
-# Build and push image
-docker build -t your-registry/nuxt-app:latest .
-docker push your-registry/nuxt-app:latest
-
-# Deploy using production compose
-docker-compose -f docker-compose.production.yml up -d
-```
-
-### Health Monitoring
-
-The application includes built-in health checks:
-
-```bash
-# Check container health
-docker-compose ps
-
-# View health check logs
-docker inspect nuxt-app_nuxt-app_1 | grep -A 10 Health
-```
-
-## 🔍 Monitoring & Logs
-
-### Container logs
-
-```bash
-docker compose logs -f nuxt-app
-```
-
-The orchestrator prints prefixed lines to stdout; nodemon output appears there while the app runs.
-
-### Admin API
+- Status signals: build entry present / nodemon running
+- Branch panel: refresh remotes, switch branch → rebuild → live
+- APIs: `/api/status`, `/api/logs`, `/api/branches`, `POST /api/branch`, `POST /api/rebuild`, `POST /api/restart-app`
 
 ```bash
 curl -s http://127.0.0.1:9091/api/status
-curl -s http://127.0.0.1:9091/api/logs?n=80
-# With ADMIN_TOKEN set:
-curl -s -X POST -H "Authorization: Bearer $ADMIN_TOKEN" http://127.0.0.1:9091/api/rebuild
-curl -s -X POST -H "Authorization: Bearer $ADMIN_TOKEN" http://127.0.0.1:9091/api/restart-app
+curl -s http://127.0.0.1:9091/api/branches
+curl -s -X POST -H "Authorization: Bearer $ADMIN_TOKEN" \
+  -H "content-type: application/json" \
+  -d '{"branch":"feature-x"}' \
+  http://127.0.0.1:9091/api/branch
 ```
 
-## 🛠️ Troubleshooting
+Details: [.wiki/Admin-API.md](.wiki/Admin-API.md).
 
-### Common Issues
-
-1. **Repository Access Issues**
-   ```bash
-   # Ensure GITHUB_REPO_URL includes token in .env file
-   GITHUB_REPO_URL=https://YOUR_TOKEN@github.com/username/repo.git
-   ```
-
-2. **Build Failures**
-   ```bash
-   docker compose logs -f nuxt-app
-   ```
-   Ensure `package.json` defines `scripts.ci` and/or `scripts.build`.
-
-3. **Application Not Starting**
-   ```bash
-   docker compose exec nuxt-app ls -la /app/.build-complete.flag
-   docker compose exec nuxt-app ls -la /app/.output/server/index.mjs
-   ```
-
-4. **Watcher / rebuild loop**
-   ```bash
-   curl -s http://127.0.0.1:9091/api/status
-   ```
-   Confirm `GIT_BRANCH` matches your default branch.
-
-### Manual Operations
+### Local admin UI development
 
 ```bash
-# Force rebuild via orchestrator (requires ADMIN_TOKEN if configured)
-curl -X POST -H "Authorization: Bearer $ADMIN_TOKEN" http://127.0.0.1:9091/api/rebuild
+bun run build:admin          # → static/ (also built in Docker)
+cd admin-ui && bun run dev   # proxy /api → :9090
+bun run start                # orchestrator in another terminal
+```
 
-# Shell inside container
+## Deployment
+
+```bash
+docker compose up -d
+docker compose logs -f nuxt-app
+
+docker build -t your-registry/nuxt-app:latest .
+docker push your-registry/nuxt-app:latest
+docker compose -f docker-compose.production.yml up -d
+```
+
+## Troubleshooting
+
+1. **Repo access** — ensure `GITHUB_REPO_URL` includes a token when needed.
+2. **Build failures** — `docker compose logs -f nuxt-app`; require `scripts.ci` and/or `scripts.build` (use `bun run …`, not `bun build`).
+3. **App not starting**
+   ```bash
+   docker compose exec nuxt-app ls -la /var/lib/orchestrator/build-complete.flag
+   docker compose exec nuxt-app ls -la /app/.output/server/index.mjs
+   ```
+4. **Wrong branch** — check `/api/status` → `gitBranch`, or `/var/lib/orchestrator/git_branch`; switch from the dashboard.
+
+```bash
 docker compose exec nuxt-app sh
 cd /app && git status
 ```
 
-## 📚 Development
+## Build expectations
 
-### Adding New Features
+The cloned app must define **`scripts.ci` and/or `scripts.build`**. The orchestrator runs `bun install` first.
 
-1. Update your Nuxt.js application in the repository
-2. Commit and push changes
-3. The watcher will automatically detect changes and rebuild
-4. Monitor logs to ensure successful deployment
+## License
 
-### Build expectations
-
-The cloned app must expose **`scripts.ci` and/or `scripts.build`** in `package.json`. The orchestrator runs `bun install` before either script.
-
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Test thoroughly
-5. Submit a pull request
-
-## 📄 License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
-
-## 🆘 Support
-
-For support and questions:
-
-- Check the troubleshooting section above
-- Review the logs for error messages
-- Ensure all prerequisites are met
-- Verify environment variables are correctly set
+MIT — see the LICENSE file for details.
 
 ---
 
-**Last Updated**: 2026-05-03T01:42:02+0200
+**Last updated**: 2026-07-27T02:36:27+0200
