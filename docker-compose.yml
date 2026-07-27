@@ -25,6 +25,8 @@ services:
       # Persistent storage for repository, build, and data
       - ./data/app:/app
       - ./data/data:/data
+      # Orchestrator CI state (branch, commits, build flag) — not Nuxt /data
+      - ./data/orchestrator:/var/lib/orchestrator
       # pnpm cache for faster builds
       - pnpm-store:/root/.local/share/pnpm
       - bun-cache:/root/.bun/install/cache

@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { mkdirSync, readFileSync } from "node:fs";
 
 export type AppConfig = {
   appRoot: string;
@@ -6,6 +6,8 @@ export type AppConfig = {
   githubRepoUrl: string;
   appOutput: string;
   appBuildDir: string;
+  /** Persistent orchestrator CI state (outside /app clone and Nuxt /data). */
+  orchestratorStateDir: string;
   buildCompleteFlag: string;
   currentCommitFile: string;
   lastCommitFile: string;
@@ -45,8 +47,17 @@ export function loadConfig(): AppConfig {
   const githubRepoUrl = process.env.GITHUB_REPO_URL ?? "";
   const appRoot = process.env.APP_ROOT ?? "/app";
   const githubRepo = process.env.GITHUB_REPO ?? appRoot;
+  const orchestratorStateDir =
+    process.env.ORCHESTRATOR_STATE_DIR ?? "/var/lib/orchestrator";
+
+  try {
+    mkdirSync(orchestratorStateDir, { recursive: true });
+  } catch {
+    /* volume may appear later; writers will retry */
+  }
+
   const gitBranchFile =
-    process.env.GIT_BRANCH_FILE ?? `${appRoot}/.orchestrator_git_branch`;
+    process.env.GIT_BRANCH_FILE ?? `${orchestratorStateDir}/git_branch`;
 
   return {
     appRoot,
@@ -54,14 +65,20 @@ export function loadConfig(): AppConfig {
     githubRepoUrl,
     appOutput: process.env.APP_OUTPUT ?? `${appRoot}/.output`,
     appBuildDir: process.env.APP_BUILD ?? `${githubRepo}/.output`,
+    orchestratorStateDir,
     buildCompleteFlag:
-      process.env.BUILD_COMPLETE_FLAG ?? `${appRoot}/.build-complete.flag`,
+      process.env.BUILD_COMPLETE_FLAG ??
+      `${orchestratorStateDir}/build-complete.flag`,
     currentCommitFile:
-      process.env.CURRENT_COMMIT_FILE ?? `${appRoot}/.current_commit`,
-    lastCommitFile: process.env.LAST_COMMIT_FILE ?? `${appRoot}/.last_commit`,
+      process.env.CURRENT_COMMIT_FILE ??
+      `${orchestratorStateDir}/current_commit`,
+    lastCommitFile:
+      process.env.LAST_COMMIT_FILE ?? `${orchestratorStateDir}/last_commit`,
     gitBranchFile,
     gitBranch:
       readPersistedBranch(gitBranchFile) ??
+      readPersistedBranch(`${appRoot}/.orchestrator_git_branch`) ??
+      readPersistedBranch("/data/.orchestrator_git_branch") ??
       process.env.GIT_BRANCH ??
       "main",
     verboseLogging: envBool("VERBOSE_LOGGING", true),

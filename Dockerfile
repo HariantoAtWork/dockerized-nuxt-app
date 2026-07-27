@@ -17,14 +17,19 @@ ENV CI=1
 ENV BETTER_AUTH_TELEMETRY=0
 ENV BETTER_AUTH_TELEMETRY_DEBUG=0
 
-# Environment variables #2 (runtime Git/app paths — cloned repo and flags live under APP_ROOT)
+# Environment variables #2 (runtime paths)
+# /app = cloned Nuxt repo + .output
+# /data = reserved for the Nuxt app
+# /var/lib/orchestrator = Docker CI / orchestrator state (volume-mounted)
 ENV APP_ROOT="/app"
 ENV GITHUB_REPO="/app"
 ENV APP_BUILD="${GITHUB_REPO}/.output"
 ENV APP_OUTPUT="${APP_ROOT}/.output"
-ENV CURRENT_COMMIT_FILE="${APP_ROOT}/.current_commit"
-ENV LAST_COMMIT_FILE="${APP_ROOT}/.last_commit"
-ENV BUILD_COMPLETE_FLAG="${APP_ROOT}/.build-complete.flag"
+ENV ORCHESTRATOR_STATE_DIR="/var/lib/orchestrator"
+ENV CURRENT_COMMIT_FILE="${ORCHESTRATOR_STATE_DIR}/current_commit"
+ENV LAST_COMMIT_FILE="${ORCHESTRATOR_STATE_DIR}/last_commit"
+ENV BUILD_COMPLETE_FLAG="${ORCHESTRATOR_STATE_DIR}/build-complete.flag"
+ENV GIT_BRANCH_FILE="${ORCHESTRATOR_STATE_DIR}/git_branch"
 ENV PROJECT_BUILD_SCRIPT="${GITHUB_REPO}/scripts/build.sh"
 
 # Admin HTTP (orchestrator dashboard). Use ADMIN_TOKEN when exposing a port.
