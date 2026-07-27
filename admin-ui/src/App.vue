@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref } from "vue";
+import { computed, onMounted, onUnmounted, ref } from "vue";
 import { api } from "./api.ts";
+import BranchSwitcher from "./components/BranchSwitcher.vue";
 import RuntimeSignals from "./components/RuntimeSignals.vue";
 import ToastStack from "./components/ToastStack.vue";
 import { useToast } from "./composables/useToast.ts";
@@ -13,6 +14,13 @@ const statusJson = ref<string | null>(null);
 const statusError = ref<string | null>(null);
 const logsText = ref<string>("");
 const logsError = ref<string | null>(null);
+const actionBusy = ref(false);
+
+const currentBranch = computed(() => snapshot.value?.gitBranch ?? null);
+const phaseBusy = computed(() => {
+  const p = snapshot.value?.phase;
+  return p === "building" || p === "syncing";
+});
 
 let pollTimer: ReturnType<typeof setInterval> | null = null;
 
@@ -48,23 +56,34 @@ async function onReload() {
 }
 
 async function onRebuild() {
+  actionBusy.value = true;
   try {
     await api("/api/rebuild", { method: "POST" });
     toast("Rebuild finished", "success");
     await refresh({});
   } catch (e) {
     toast(e instanceof Error ? e.message : String(e), "error");
+  } finally {
+    actionBusy.value = false;
   }
 }
 
 async function onRestart() {
+  actionBusy.value = true;
   try {
     await api("/api/restart-app", { method: "POST" });
     toast("App restarted", "success");
     await refresh({});
   } catch (e) {
     toast(e instanceof Error ? e.message : String(e), "error");
+  } finally {
+    actionBusy.value = false;
   }
+}
+
+async function onBranchSwitched() {
+  toast("Branch deployed live", "success");
+  await refresh({});
 }
 
 onMounted(() => {
@@ -85,21 +104,43 @@ onUnmounted(() => {
       <header class="hero">
         <p class="brand">Nuxt orchestrator</p>
         <p class="lead">
-          Watch build output and nodemon at a glance. Mutating actions need
-          <code>ADMIN_TOKEN</code> when set — pass <code>?token=…</code> if required.
+          Switch git branches, rebuild, and watch runtime health. Mutating
+          actions need <code>ADMIN_TOKEN</code> when set — pass
+          <code>?token=…</code> if required.
         </p>
       </header>
 
       <RuntimeSignals :snapshot="snapshot" />
 
+      <BranchSwitcher
+        :current-branch="currentBranch"
+        :busy="actionBusy || phaseBusy"
+        @switched="onBranchSwitched"
+        @error="(msg) => toast(msg, 'error')"
+      />
+
       <p v-if="statusError" class="err banner">{{ statusError }}</p>
 
       <div class="actions">
-        <button type="button" class="btn" @click="onReload">Refresh</button>
-        <button type="button" class="btn btn-primary" @click="onRebuild">
+        <button type="button" class="btn" :disabled="actionBusy" @click="onReload">
+          Refresh
+        </button>
+        <button
+          type="button"
+          class="btn btn-primary"
+          :disabled="actionBusy"
+          @click="onRebuild"
+        >
           Rebuild
         </button>
-        <button type="button" class="btn" @click="onRestart">Restart app</button>
+        <button
+          type="button"
+          class="btn"
+          :disabled="actionBusy"
+          @click="onRestart"
+        >
+          Restart app
+        </button>
       </div>
 
       <details class="panel">
@@ -201,9 +242,14 @@ code {
     border-color 0.2s ease;
 }
 
-.btn:hover {
+.btn:hover:not(:disabled) {
   background: #fff;
   transform: translateY(-1px);
+}
+
+.btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
 }
 
 .btn-primary {
@@ -212,7 +258,7 @@ code {
   color: #f3faf6;
 }
 
-.btn-primary:hover {
+.btn-primary:hover:not(:disabled) {
   background: #1f4a3d;
   border-color: #1f4a3d;
 }

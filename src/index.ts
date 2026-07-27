@@ -4,11 +4,14 @@ import { startAdminServer } from "./admin-server.ts";
 import { runInstallAndBuild } from "./build-pipeline.ts";
 import { loadConfig } from "./config.ts";
 import { isDirectory, isFile } from "./fs-utils.ts";
+import { assertValidGitBranch } from "./git-branch.ts";
 import { createRingLog } from "./logger.ts";
 import { Mutex } from "./mutex.ts";
 import { redactGitUrl } from "./redact.ts";
 import {
   clearBuildFlag,
+  listRemoteBranches,
+  persistGitBranch,
   syncGitRepository,
   touchBuildFlag,
 } from "./repo-sync.ts";
@@ -44,7 +47,9 @@ async function main() {
   }
 
   const log = createRingLog(cfg.verboseLogging);
-  log.info(`Orchestrator starting; repo URL: ${redactGitUrl(cfg.githubRepoUrl)}`);
+  log.info(
+    `Orchestrator starting; repo URL: ${redactGitUrl(cfg.githubRepoUrl)}; branch: ${cfg.gitBranch}`,
+  );
 
   const mutex = new Mutex();
   const app = createAppRunner(cfg, log);
@@ -72,6 +77,23 @@ async function main() {
     lastBuildAt = new Date().toISOString();
   }
 
+  async function rebuildAndRestart(label: string): Promise<void> {
+    log.info(label);
+    phase = "building";
+    try {
+      await executeBuildPhase({ forceBuild: true });
+      await waitForRunnable(cfg);
+      phase = "running";
+      await app.stop();
+      await app.start();
+    } catch (e) {
+      lastError = e instanceof Error ? e.message : String(e);
+      log.error(lastError);
+      phase = "idle";
+      throw e;
+    }
+  }
+
   function getSnapshot(): OrchestratorSnapshot {
     const serverEntryPath = `${cfg.appOutput}/server/index.mjs`;
     return {
@@ -93,22 +115,26 @@ async function main() {
   const admin = startAdminServer(cfg, {
     getSnapshot,
     getLogs: (n) => log.tail(n),
+    listBranches: async () => ({
+      current: cfg.gitBranch,
+      branches: await listRemoteBranches(cfg),
+    }),
+    switchBranch: async (branch) => {
+      const safe = assertValidGitBranch(branch);
+      await mutex.runExclusive(async () => {
+        if (safe === cfg.gitBranch) {
+          log.info(`Admin: already on branch ${safe}; forcing rebuild`);
+        } else {
+          log.info(`Admin: switching branch ${cfg.gitBranch} → ${safe}`);
+          phase = "syncing";
+          await persistGitBranch(cfg, safe);
+        }
+        await rebuildAndRestart(`Admin: live deploy for branch ${safe}`);
+      });
+    },
     triggerRebuild: async () => {
       await mutex.runExclusive(async () => {
-        log.info("Admin: forced rebuild");
-        phase = "building";
-        try {
-          await executeBuildPhase({ forceBuild: true });
-          await waitForRunnable(cfg);
-          phase = "running";
-          await app.stop();
-          await app.start();
-        } catch (e) {
-          lastError = e instanceof Error ? e.message : String(e);
-          log.error(lastError);
-          phase = "idle";
-          throw e;
-        }
+        await rebuildAndRestart("Admin: forced rebuild");
       });
     },
     restartApp: async () => {
@@ -147,7 +173,6 @@ async function main() {
 
     stopWatcher = startCommitWatcher(cfg, log, async () => {
       await mutex.runExclusive(async () => {
-        log.info("Rebuild triggered by watcher");
         phase = "building";
         try {
           await executeBuildPhase({ forceBuild: false });

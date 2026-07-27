@@ -8,12 +8,12 @@ export function startCommitWatcher(
   log: RingLog,
   onUpdate: () => Promise<void>,
 ): () => void {
-  const remoteRef = `origin/${cfg.gitBranch}`;
   let timer: ReturnType<typeof setInterval> | null = null;
 
   async function tick() {
     try {
       const repo = cfg.githubRepo;
+      const remoteRef = `origin/${cfg.gitBranch}`;
       await runCmd(["git", "reset", "--hard", "HEAD"], repo);
 
       const current = (
@@ -26,11 +26,11 @@ export function startCommitWatcher(
 
       if (current !== latest) {
         log.info(
-          `Watcher: new commits (${current.slice(0, 7)} → ${latest.slice(0, 7)}); rebuilding…`,
+          `Watcher: new commits on ${cfg.gitBranch} (${current.slice(0, 7)} → ${latest.slice(0, 7)}); rebuilding…`,
         );
         await onUpdate();
       } else if (cfg.verboseLogging) {
-        log.info("Watcher: no new commits.");
+        log.info(`Watcher: no new commits on ${cfg.gitBranch}.`);
       }
     } catch (e) {
       log.error(

@@ -5,6 +5,8 @@ import { staticDashboardMissingHtml, tryServeStatic } from "./static-serve.ts";
 export type AdminHandlers = {
   getSnapshot: () => OrchestratorSnapshot;
   getLogs: (n: number) => string[];
+  listBranches: () => Promise<{ current: string; branches: string[] }>;
+  switchBranch: (branch: string) => Promise<void>;
   triggerRebuild: () => Promise<void>;
   restartApp: () => Promise<void>;
 };
@@ -48,6 +50,25 @@ export function startAdminServer(
         return json({
           lines: handlers.getLogs(Number.isFinite(n) ? n : 120),
         });
+      }
+
+      if (req.method === "GET" && pathname === "/api/branches") {
+        return json(await handlers.listBranches());
+      }
+
+      if (req.method === "POST" && pathname === "/api/branch") {
+        if (!allowMutation(cfg, req)) return unauthorized();
+        let body: { branch?: unknown };
+        try {
+          body = (await req.json()) as { branch?: unknown };
+        } catch {
+          return json({ error: "Expected JSON body with branch" }, 400);
+        }
+        if (typeof body.branch !== "string") {
+          return json({ error: "branch must be a string" }, 400);
+        }
+        await handlers.switchBranch(body.branch);
+        return json({ ok: true, branch: cfg.gitBranch });
       }
 
       if (req.method === "POST" && pathname === "/api/rebuild") {

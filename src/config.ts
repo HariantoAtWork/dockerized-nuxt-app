@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+
 export type AppConfig = {
   appRoot: string;
   githubRepo: string;
@@ -7,6 +9,8 @@ export type AppConfig = {
   buildCompleteFlag: string;
   currentCommitFile: string;
   lastCommitFile: string;
+  gitBranchFile: string;
+  /** Mutable at runtime when switching branches from the admin UI. */
   gitBranch: string;
   verboseLogging: boolean;
   adminBind: string;
@@ -28,10 +32,21 @@ function envInt(name: string, defaultValue: number): number {
   return Number.isFinite(n) ? n : defaultValue;
 }
 
+function readPersistedBranch(path: string): string | null {
+  try {
+    const t = readFileSync(path, "utf8").trim();
+    return t || null;
+  } catch {
+    return null;
+  }
+}
+
 export function loadConfig(): AppConfig {
   const githubRepoUrl = process.env.GITHUB_REPO_URL ?? "";
   const appRoot = process.env.APP_ROOT ?? "/app";
   const githubRepo = process.env.GITHUB_REPO ?? appRoot;
+  const gitBranchFile =
+    process.env.GIT_BRANCH_FILE ?? `${appRoot}/.orchestrator_git_branch`;
 
   return {
     appRoot,
@@ -44,7 +59,11 @@ export function loadConfig(): AppConfig {
     currentCommitFile:
       process.env.CURRENT_COMMIT_FILE ?? `${appRoot}/.current_commit`,
     lastCommitFile: process.env.LAST_COMMIT_FILE ?? `${appRoot}/.last_commit`,
-    gitBranch: process.env.GIT_BRANCH ?? "main",
+    gitBranchFile,
+    gitBranch:
+      readPersistedBranch(gitBranchFile) ??
+      process.env.GIT_BRANCH ??
+      "main",
     verboseLogging: envBool("VERBOSE_LOGGING", true),
     adminBind: process.env.ADMIN_BIND ?? "0.0.0.0",
     adminPort: envInt("ADMIN_PORT", 9090),
