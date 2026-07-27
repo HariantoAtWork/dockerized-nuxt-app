@@ -1,4 +1,5 @@
 import type { AppConfig } from "./config.ts";
+import { commitSubject, shortSha } from "./git-commit.ts";
 import type { RingLog } from "./logger.ts";
 import { runCmd } from "./process.ts";
 
@@ -25,8 +26,10 @@ export function startCommitWatcher(
       ).stdout.trim();
 
       if (current !== latest) {
+        const subject = await commitSubject(repo, latest);
+        const subjectPart = subject ? ` “${subject}”` : "";
         log.info(
-          `Watcher: new commits on ${cfg.gitBranch} (${current.slice(0, 7)} → ${latest.slice(0, 7)}); rebuilding…`,
+          `Watcher: new commits on ${cfg.gitBranch} (${shortSha(current)} → ${shortSha(latest)}${subjectPart}); rebuilding…`,
         );
         await onUpdate();
       } else if (cfg.verboseLogging) {

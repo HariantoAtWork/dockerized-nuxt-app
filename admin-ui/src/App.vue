@@ -2,6 +2,7 @@
 import { computed, onMounted, onUnmounted, ref } from "vue";
 import { api } from "./api.ts";
 import BranchSwitcher from "./components/BranchSwitcher.vue";
+import CommitStatus from "./components/CommitStatus.vue";
 import RuntimeSignals from "./components/RuntimeSignals.vue";
 import ToastStack from "./components/ToastStack.vue";
 import { useToast } from "./composables/useToast.ts";
@@ -111,6 +112,8 @@ onUnmounted(() => {
       </header>
 
       <RuntimeSignals :snapshot="snapshot" />
+
+      <CommitStatus :snapshot="snapshot" />
 
       <BranchSwitcher
         :current-branch="currentBranch"

@@ -5,6 +5,7 @@ import { runInstallAndBuild } from "./build-pipeline.ts";
 import { loadConfig } from "./config.ts";
 import { isDirectory, isFile } from "./fs-utils.ts";
 import { assertValidGitBranch } from "./git-branch.ts";
+import { commitSubject } from "./git-commit.ts";
 import { createRingLog } from "./logger.ts";
 import { Mutex } from "./mutex.ts";
 import { redactGitUrl } from "./redact.ts";
@@ -94,14 +95,22 @@ async function main() {
     }
   }
 
-  function getSnapshot(): OrchestratorSnapshot {
+  async function getSnapshot(): Promise<OrchestratorSnapshot> {
     const serverEntryPath = `${cfg.appOutput}/server/index.mjs`;
+    const currentCommit = readCommitFile(cfg.currentCommitFile);
+    const remoteCommit = readCommitFile(cfg.lastCommitFile);
+    const [currentCommitMessage, remoteCommitMessage] = await Promise.all([
+      commitSubject(cfg.githubRepo, currentCommit),
+      commitSubject(cfg.githubRepo, remoteCommit),
+    ]);
     return {
       phase,
       gitBranch: cfg.gitBranch,
       repoRoot: cfg.githubRepo,
-      currentCommit: readCommitFile(cfg.currentCommitFile),
-      remoteCommit: readCommitFile(cfg.lastCommitFile),
+      currentCommit,
+      currentCommitMessage,
+      remoteCommit,
+      remoteCommitMessage,
       appRunning: app.isRunning(),
       appPid: app.getPid(),
       serverEntryExists: isFile(serverEntryPath),

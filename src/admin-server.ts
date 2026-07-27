@@ -3,7 +3,7 @@ import type { OrchestratorSnapshot } from "./types.ts";
 import { staticDashboardMissingHtml, tryServeStatic } from "./static-serve.ts";
 
 export type AdminHandlers = {
-  getSnapshot: () => OrchestratorSnapshot;
+  getSnapshot: () => OrchestratorSnapshot | Promise<OrchestratorSnapshot>;
   getLogs: (n: number) => string[];
   listBranches: () => Promise<{ current: string; branches: string[] }>;
   switchBranch: (branch: string) => Promise<void>;
@@ -42,7 +42,7 @@ export function startAdminServer(
       const pathname = url.pathname;
 
       if (req.method === "GET" && pathname === "/api/status") {
-        return json(handlers.getSnapshot());
+        return json(await handlers.getSnapshot());
       }
 
       if (req.method === "GET" && pathname === "/api/logs") {
