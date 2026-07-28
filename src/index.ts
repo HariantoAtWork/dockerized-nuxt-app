@@ -6,6 +6,7 @@ import { loadConfig } from "./config.ts";
 import { isDirectory, isFile } from "./fs-utils.ts";
 import { assertValidGitBranch } from "./git-branch.ts";
 import { commitSubject } from "./git-commit.ts";
+import { toRepoWebUrl } from "./git-web-url.ts";
 import { createRingLog } from "./logger.ts";
 import { Mutex } from "./mutex.ts";
 import { redactGitUrl } from "./redact.ts";
@@ -107,6 +108,7 @@ async function main() {
       phase,
       gitBranch: cfg.gitBranch,
       repoRoot: cfg.githubRepo,
+      repoWebUrl: toRepoWebUrl(cfg.githubRepoUrl),
       currentCommit,
       currentCommitMessage,
       remoteCommit,

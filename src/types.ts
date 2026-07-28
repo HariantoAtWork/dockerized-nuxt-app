@@ -4,6 +4,7 @@ export type OrchestratorSnapshot = {
   phase: OrchestratorPhase;
   gitBranch: string;
   repoRoot: string;
+  repoWebUrl: string | null;
   currentCommit: string | null;
   currentCommitMessage: string | null;
   remoteCommit: string | null;

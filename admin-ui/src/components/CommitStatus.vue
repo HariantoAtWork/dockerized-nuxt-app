@@ -13,6 +13,12 @@ function shortSha(sha: string | null | undefined): string {
 
 const currentSha = computed(() => shortSha(props.snapshot?.currentCommit));
 const remoteSha = computed(() => shortSha(props.snapshot?.remoteCommit));
+const currentCommitUrl = computed(() => {
+  const repoWebUrl = props.snapshot?.repoWebUrl;
+  const currentCommit = props.snapshot?.currentCommit;
+  if (!repoWebUrl || !currentCommit) return null;
+  return `${repoWebUrl}/commit/${currentCommit}`;
+});
 
 const currentMessage = computed(
   () => props.snapshot?.currentCommitMessage?.trim() || "No message",
@@ -35,7 +41,17 @@ const branch = computed(() => props.snapshot?.gitBranch ?? "—");
     <header class="commits-head">
       <p class="eyebrow">Deployed commit</p>
       <h2 class="title">
-        <span class="mono sha" :title="snapshot?.currentCommit ?? undefined">{{
+        <a
+          v-if="currentCommitUrl"
+          class="mono sha sha-link"
+          :href="currentCommitUrl"
+          :title="snapshot?.currentCommit ?? undefined"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          {{ currentSha }}
+        </a>
+        <span v-else class="mono sha" :title="snapshot?.currentCommit ?? undefined">{{
           currentSha
         }}</span>
         <span class="branch">on {{ branch }}</span>
@@ -98,6 +114,18 @@ const branch = computed(() => props.snapshot?.gitBranch ?? "—");
   font-size: 1em;
   font-weight: 600;
   letter-spacing: -0.02em;
+}
+
+.sha-link {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 0.16em;
+  text-decoration-color: rgba(16, 36, 31, 0.28);
+}
+
+.sha-link:hover,
+.sha-link:focus-visible {
+  text-decoration-color: rgba(16, 36, 31, 0.7);
 }
 
 .branch {
