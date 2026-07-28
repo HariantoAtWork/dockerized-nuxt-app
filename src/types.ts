@@ -5,6 +5,7 @@ export type OrchestratorSnapshot = {
   gitBranch: string;
   repoRoot: string;
   repoWebUrl: string | null;
+  pinnedCommit: string | null;
   currentCommit: string | null;
   currentCommitMessage: string | null;
   remoteCommit: string | null;

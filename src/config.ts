@@ -12,6 +12,8 @@ export type AppConfig = {
   currentCommitFile: string;
   lastCommitFile: string;
   gitBranchFile: string;
+  /** When set, sync stays on this commit instead of tracking the branch tip. */
+  pinnedCommitFile: string;
   /** Mutable at runtime when switching branches from the admin UI. */
   gitBranch: string;
   verboseLogging: boolean;
@@ -75,6 +77,9 @@ export function loadConfig(): AppConfig {
     lastCommitFile:
       process.env.LAST_COMMIT_FILE ?? `${orchestratorStateDir}/last_commit`,
     gitBranchFile,
+    pinnedCommitFile:
+      process.env.PINNED_COMMIT_FILE ??
+      `${orchestratorStateDir}/pinned_commit`,
     gitBranch:
       readPersistedBranch(gitBranchFile) ??
       readPersistedBranch(`${appRoot}/.orchestrator_git_branch`) ??

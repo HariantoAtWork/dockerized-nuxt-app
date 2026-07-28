@@ -4,6 +4,7 @@ import { api } from "../api.ts";
 
 const props = defineProps<{
   currentBranch: string | null;
+  pinned?: boolean;
   busy?: boolean;
 }>();
 
@@ -24,7 +25,22 @@ const disabled = computed(
 
 const canSwitch = computed(() => {
   const next = selected.value.trim();
-  return Boolean(next) && next !== props.currentBranch && !disabled.value;
+  if (!next || disabled.value) return false;
+  // Same branch is allowed when pinned, so Live Checkout can return to tip.
+  if (props.pinned) return true;
+  return next !== props.currentBranch;
+});
+
+const actionLabel = computed(() => {
+  if (switching.value) return "Deploying…";
+  if (
+    props.pinned &&
+    selected.value.trim() &&
+    selected.value.trim() === props.currentBranch
+  ) {
+    return "Unpin & rebuild tip";
+  }
+  return "Switch & rebuild";
 });
 
 async function loadBranches() {
@@ -80,6 +96,10 @@ onMounted(() => {
       <h2 class="title">Live checkout</h2>
       <p class="hint">
         Switch remote branch, rebuild, and put it live for testing.
+        <template v-if="pinned">
+          A commit pin is active — Switch & rebuild also unpins and follows the
+          branch tip again.
+        </template>
       </p>
     </header>
 
@@ -104,7 +124,7 @@ onMounted(() => {
         :disabled="!canSwitch"
         @click="onSwitch"
       >
-        {{ switching ? "Deploying…" : "Switch & rebuild" }}
+        {{ actionLabel }}
       </button>
 
       <button
@@ -120,6 +140,7 @@ onMounted(() => {
 
     <p v-if="props.currentBranch" class="current mono">
       Active: <strong>{{ props.currentBranch }}</strong>
+      <span v-if="pinned" class="pin-note"> · pinned commit</span>
     </p>
     <p v-if="listError" class="err">{{ listError }}</p>
     <p v-if="switching" class="busy">
@@ -255,6 +276,11 @@ onMounted(() => {
   margin: 0.85rem 0 0;
   font-size: 0.82rem;
   color: var(--muted);
+}
+
+.pin-note {
+  color: #6b3f14;
+  font-weight: 600;
 }
 
 .mono {

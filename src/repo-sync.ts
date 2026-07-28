@@ -2,6 +2,7 @@ import type { AppConfig } from "./config.ts";
 import type { RingLog } from "./logger.ts";
 import { isDirectory, isFile } from "./fs-utils.ts";
 import { assertValidGitBranch } from "./git-branch.ts";
+import { assertValidGitCommit } from "./git-commit-ref.ts";
 import { runCmd } from "./process.ts";
 
 async function writeTextFile(path: string, content: string) {
@@ -22,6 +23,27 @@ export type SyncResult = {
   remoteCommit: string | null;
 };
 
+export async function readPinnedCommit(cfg: AppConfig): Promise<string | null> {
+  try {
+    const t = (await Bun.file(cfg.pinnedCommitFile).text()).trim();
+    return t || null;
+  } catch {
+    return null;
+  }
+}
+
+export async function persistPinnedCommit(
+  cfg: AppConfig,
+  commit: string,
+): Promise<void> {
+  const safe = assertValidGitCommit(commit);
+  await writeTextFile(cfg.pinnedCommitFile, `${safe}\n`);
+}
+
+export async function clearPinnedCommit(cfg: AppConfig): Promise<void> {
+  await rmIfExists(cfg.pinnedCommitFile);
+}
+
 async function checkoutTrackedBranch(
   cfg: AppConfig,
   log: RingLog,
@@ -33,6 +55,24 @@ async function checkoutTrackedBranch(
   await runCmd(["git", "fetch", "origin"], repo);
   await runCmd(["git", "checkout", "-B", branch, remoteRef], repo);
   await runCmd(["git", "clean", "-fd"], repo);
+}
+
+export async function checkoutPinnedCommit(
+  cfg: AppConfig,
+  log: RingLog,
+  commitRef: string,
+): Promise<string> {
+  const repo = cfg.githubRepo;
+  const safe = assertValidGitCommit(commitRef);
+  log.info(`Checking out pinned commit ${safe}...`);
+  await runCmd(["git", "fetch", "origin"], repo);
+  const resolved = (
+    await runCmd(["git", "rev-parse", "--verify", `${safe}^{commit}`], repo)
+  ).stdout.trim();
+  await runCmd(["git", "checkout", "--detach", resolved], repo);
+  await runCmd(["git", "clean", "-fd"], repo);
+  await writeTextFile(cfg.currentCommitFile, `${resolved}\n`);
+  return resolved;
 }
 
 export async function persistGitBranch(
@@ -99,6 +139,15 @@ export async function syncGitRepository(
     return /^UU|^AA|^DD/m.test(stdout);
   };
 
+  const markBuildIfMissingOutput = () => {
+    const outMjs = `${cfg.appBuildDir}/server/index.mjs`;
+    const hasOutput = isDirectory(cfg.appBuildDir) && isFile(outMjs);
+    if (!hasOutput) {
+      log.info("Build output missing or incomplete; rebuild needed.");
+      buildNeeded = true;
+    }
+  };
+
   if (isDirectory(repo) && isDirectory(`${repo}/.git`)) {
     log.info(`Repository exists. Tracking ${remoteRef}...`);
     currentCommit = (await runCmd(["git", "rev-parse", "HEAD"], repo)).stdout
@@ -115,6 +164,29 @@ export async function syncGitRepository(
     }
     remoteCommit = remoteProbe.stdout.trim();
     await writeTextFile(cfg.lastCommitFile, `${remoteCommit}\n`);
+
+    const pinned = await readPinnedCommit(cfg);
+    if (pinned) {
+      const resolvedPin = (
+        await runCmd(
+          ["git", "rev-parse", "--verify", `${pinned}^{commit}`],
+          repo,
+        )
+      ).stdout.trim();
+      if (currentCommit !== resolvedPin) {
+        log.info(
+          `Pinned commit active (${resolvedPin.slice(0, 7)}); staying detached from branch tip.`,
+        );
+        currentCommit = await checkoutPinnedCommit(cfg, log, resolvedPin);
+        buildNeeded = true;
+      } else {
+        log.info(
+          `Pinned commit ${resolvedPin.slice(0, 7)} already checked out.`,
+        );
+        markBuildIfMissingOutput();
+      }
+      return { buildNeeded, currentCommit, remoteCommit };
+    }
 
     const currentBranch = (
       await runCmd(["git", "rev-parse", "--abbrev-ref", "HEAD"], repo, {
@@ -140,12 +212,7 @@ export async function syncGitRepository(
       await writeTextFile(cfg.currentCommitFile, `${currentCommit}\n`);
     } else {
       log.info("Repository is up to date.");
-      const outMjs = `${cfg.appBuildDir}/server/index.mjs`;
-      const hasOutput = isDirectory(cfg.appBuildDir) && isFile(outMjs);
-      if (!hasOutput) {
-        log.info("Build output missing or incomplete; rebuild needed.");
-        buildNeeded = true;
-      }
+      markBuildIfMissingOutput();
     }
   } else if (isDirectory(repo) && !isDirectory(`${repo}/.git`)) {
     log.info("Folder exists without .git; recovering repository...");

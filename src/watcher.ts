@@ -2,6 +2,7 @@ import type { AppConfig } from "./config.ts";
 import { commitSubject, shortSha } from "./git-commit.ts";
 import type { RingLog } from "./logger.ts";
 import { runCmd } from "./process.ts";
+import { readPinnedCommit } from "./repo-sync.ts";
 
 /** Polls Git for new commits and invokes onUpdate when remote moves ahead. */
 export function startCommitWatcher(
@@ -13,6 +14,16 @@ export function startCommitWatcher(
 
   async function tick() {
     try {
+      const pinned = await readPinnedCommit(cfg);
+      if (pinned) {
+        if (cfg.verboseLogging) {
+          log.info(
+            `Watcher: pinned to ${shortSha(pinned)}; skipping tip auto-update.`,
+          );
+        }
+        return;
+      }
+
       const repo = cfg.githubRepo;
       const remoteRef = `origin/${cfg.gitBranch}`;
       await runCmd(["git", "reset", "--hard", "HEAD"], repo);

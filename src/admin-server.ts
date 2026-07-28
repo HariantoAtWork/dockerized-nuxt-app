@@ -1,12 +1,16 @@
 import type { AppConfig } from "./config.ts";
+import type { GitGraphSnapshot } from "./git-graph.ts";
 import type { OrchestratorSnapshot } from "./types.ts";
 import { staticDashboardMissingHtml, tryServeStatic } from "./static-serve.ts";
 
 export type AdminHandlers = {
   getSnapshot: () => OrchestratorSnapshot | Promise<OrchestratorSnapshot>;
+  getGitGraph: (limit: number) => Promise<GitGraphSnapshot>;
   getLogs: (n: number) => string[];
   listBranches: () => Promise<{ current: string; branches: string[] }>;
   switchBranch: (branch: string) => Promise<void>;
+  switchCommit: (commit: string) => Promise<void>;
+  unpinCommit: () => Promise<void>;
   triggerRebuild: () => Promise<void>;
   restartApp: () => Promise<void>;
 };
@@ -52,6 +56,11 @@ export function startAdminServer(
         });
       }
 
+      if (req.method === "GET" && pathname === "/api/git-graph") {
+        const n = Number.parseInt(url.searchParams.get("n") ?? "30", 10);
+        return json(await handlers.getGitGraph(Number.isFinite(n) ? n : 30));
+      }
+
       if (req.method === "GET" && pathname === "/api/branches") {
         return json(await handlers.listBranches());
       }
@@ -68,6 +77,27 @@ export function startAdminServer(
           return json({ error: "branch must be a string" }, 400);
         }
         await handlers.switchBranch(body.branch);
+        return json({ ok: true, branch: cfg.gitBranch });
+      }
+
+      if (req.method === "POST" && pathname === "/api/commit") {
+        if (!allowMutation(cfg, req)) return unauthorized();
+        let body: { commit?: unknown };
+        try {
+          body = (await req.json()) as { commit?: unknown };
+        } catch {
+          return json({ error: "Expected JSON body with commit" }, 400);
+        }
+        if (typeof body.commit !== "string") {
+          return json({ error: "commit must be a string" }, 400);
+        }
+        await handlers.switchCommit(body.commit);
+        return json({ ok: true });
+      }
+
+      if (req.method === "POST" && pathname === "/api/commit/unpin") {
+        if (!allowMutation(cfg, req)) return unauthorized();
+        await handlers.unpinCommit();
         return json({ ok: true, branch: cfg.gitBranch });
       }
 

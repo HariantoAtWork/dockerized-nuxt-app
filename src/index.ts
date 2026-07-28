@@ -6,14 +6,20 @@ import { loadConfig } from "./config.ts";
 import { isDirectory, isFile } from "./fs-utils.ts";
 import { assertValidGitBranch } from "./git-branch.ts";
 import { commitSubject } from "./git-commit.ts";
+import { assertValidGitCommit } from "./git-commit-ref.ts";
+import { getGitGraph } from "./git-graph.ts";
 import { toRepoWebUrl } from "./git-web-url.ts";
 import { createRingLog } from "./logger.ts";
 import { Mutex } from "./mutex.ts";
 import { redactGitUrl } from "./redact.ts";
 import {
+  checkoutPinnedCommit,
   clearBuildFlag,
+  clearPinnedCommit,
   listRemoteBranches,
   persistGitBranch,
+  persistPinnedCommit,
+  readPinnedCommit,
   syncGitRepository,
   touchBuildFlag,
 } from "./repo-sync.ts";
@@ -100,15 +106,18 @@ async function main() {
     const serverEntryPath = `${cfg.appOutput}/server/index.mjs`;
     const currentCommit = readCommitFile(cfg.currentCommitFile);
     const remoteCommit = readCommitFile(cfg.lastCommitFile);
-    const [currentCommitMessage, remoteCommitMessage] = await Promise.all([
-      commitSubject(cfg.githubRepo, currentCommit),
-      commitSubject(cfg.githubRepo, remoteCommit),
-    ]);
+    const [currentCommitMessage, remoteCommitMessage, pinnedCommit] =
+      await Promise.all([
+        commitSubject(cfg.githubRepo, currentCommit),
+        commitSubject(cfg.githubRepo, remoteCommit),
+        readPinnedCommit(cfg),
+      ]);
     return {
       phase,
       gitBranch: cfg.gitBranch,
       repoRoot: cfg.githubRepo,
       repoWebUrl: toRepoWebUrl(cfg.githubRepoUrl),
+      pinnedCommit,
       currentCommit,
       currentCommitMessage,
       remoteCommit,
@@ -125,6 +134,7 @@ async function main() {
 
   const admin = startAdminServer(cfg, {
     getSnapshot,
+    getGitGraph: async (n) => getGitGraph(cfg.githubRepo, n),
     getLogs: (n) => log.tail(n),
     listBranches: async () => ({
       current: cfg.gitBranch,
@@ -133,14 +143,51 @@ async function main() {
     switchBranch: async (branch) => {
       const safe = assertValidGitBranch(branch);
       await mutex.runExclusive(async () => {
+        const wasPinned = await readPinnedCommit(cfg);
+        await clearPinnedCommit(cfg);
+        if (wasPinned) {
+          log.info(
+            `Admin: clearing pin ${wasPinned.slice(0, 7)} before branch deploy`,
+          );
+        }
         if (safe === cfg.gitBranch) {
-          log.info(`Admin: already on branch ${safe}; forcing rebuild`);
+          log.info(
+            wasPinned
+              ? `Admin: unpinning and rebuilding tip of ${safe}`
+              : `Admin: already on branch ${safe}; forcing rebuild`,
+          );
         } else {
           log.info(`Admin: switching branch ${cfg.gitBranch} → ${safe}`);
           phase = "syncing";
           await persistGitBranch(cfg, safe);
         }
         await rebuildAndRestart(`Admin: live deploy for branch ${safe}`);
+      });
+    },
+    switchCommit: async (commit) => {
+      const safe = assertValidGitCommit(commit);
+      await mutex.runExclusive(async () => {
+        phase = "syncing";
+        const resolved = await checkoutPinnedCommit(cfg, log, safe);
+        await persistPinnedCommit(cfg, resolved);
+        await rebuildAndRestart(
+          `Admin: live deploy for commit ${resolved.slice(0, 7)}`,
+        );
+      });
+    },
+    unpinCommit: async () => {
+      await mutex.runExclusive(async () => {
+        const pinned = await readPinnedCommit(cfg);
+        await clearPinnedCommit(cfg);
+        phase = "syncing";
+        log.info(
+          pinned
+            ? `Admin: unpinning ${pinned.slice(0, 7)}; returning to origin/${cfg.gitBranch}`
+            : `Admin: no pin set; syncing origin/${cfg.gitBranch}`,
+        );
+        await rebuildAndRestart(
+          `Admin: unpinned; live deploy for branch ${cfg.gitBranch}`,
+        );
       });
     },
     triggerRebuild: async () => {
