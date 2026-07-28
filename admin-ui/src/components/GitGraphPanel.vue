@@ -41,6 +41,17 @@ const actionsDisabled = computed(
     unpinning.value,
 );
 
+/** Keep lane column narrow in the side panel; SVG scales via viewBox. */
+const MAX_LANE_W = 96;
+
+function laneDisplayWidth(layoutWidth: number): number {
+  return Math.min(layoutWidth, MAX_LANE_W);
+}
+
+function nodeLeftPercent(cx: number, layoutWidth: number): string {
+  return `${(cx / layoutWidth) * 100}%`;
+}
+
 function isPinnedCommit(commit: GitGraphCommit): boolean {
   return Boolean(
     props.pinnedCommit &&
@@ -122,12 +133,11 @@ watch(
       >
         <div
           class="lane-cell"
-          :style="{ width: `${layout.width}px` }"
+          :style="{ width: `${laneDisplayWidth(layout.width)}px` }"
           aria-hidden="true"
         >
           <svg
             class="lane-svg"
-            :width="layout.width"
             :viewBox="`0 0 ${layout.width} ${row.height}`"
             preserveAspectRatio="none"
           >
@@ -148,7 +158,7 @@ watch(
             class="node-dot"
             :class="nodeClass(row.commit)"
             :style="{
-              left: `${row.node.cx}px`,
+              left: nodeLeftPercent(row.node.cx, layout.width),
               top: `${TITLE_NODE_OFFSET}px`,
               background: nodeFill(row.commit, row.node.color),
             }"
@@ -220,6 +230,7 @@ watch(
 
 <style scoped>
 .panel {
+  min-width: 0;
   margin-bottom: 1rem;
   padding: 0.95rem 1.05rem;
   border-radius: 1rem;
@@ -249,7 +260,8 @@ watch(
   margin: 0;
   padding: 0;
   max-height: 34rem;
-  overflow: auto;
+  overflow-x: hidden;
+  overflow-y: auto;
   border-radius: 0.6rem;
   border: 1px solid rgba(16, 36, 31, 0.1);
   background: #f7f9f8;
@@ -257,7 +269,7 @@ watch(
 
 .row-item {
   display: grid;
-  grid-template-columns: auto 1fr;
+  grid-template-columns: auto minmax(0, 1fr);
   align-items: stretch;
   box-sizing: border-box;
   border-bottom: 1px solid rgba(16, 36, 31, 0.06);
@@ -351,6 +363,7 @@ watch(
   font-size: 0.86rem;
   line-height: 1.3;
   font-weight: 600;
+  overflow-wrap: anywhere;
 }
 
 .meta {
@@ -358,6 +371,7 @@ watch(
   color: #5c6f68;
   font-size: 0.74rem;
   line-height: 1.4;
+  overflow-wrap: anywhere;
 }
 
 .mono {
