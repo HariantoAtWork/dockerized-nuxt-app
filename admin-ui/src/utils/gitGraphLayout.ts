@@ -15,7 +15,7 @@ const COMMIT_ROW_BASE_H = 58;
 const CONNECTOR_ROW_H = 14;
 const CHAR_W = 9;
 const PAD_X = 12;
-const STROKE = 2.25;
+const STROKE = 2;
 const NODE_R = 5;
 /** Align nodes with the commit title: content padding-top (~0.55rem) + half subject line. */
 export const TITLE_NODE_OFFSET = 18;
@@ -57,8 +57,9 @@ function charToCol(charIndex: number): number {
   return Math.floor(charIndex / 2);
 }
 
-function xAt(charIndex: number): number {
-  return PAD_X + charIndex * CHAR_W + CHAR_W / 2;
+/** Horizontal centre of a graph character column, relative to the used lane span. */
+function xAt(charIndex: number, origin: number): number {
+  return PAD_X + (charIndex - origin) * CHAR_W + CHAR_W / 2;
 }
 
 function lastNonSpaceIndex(lane: string, before: number): number {
@@ -73,6 +74,24 @@ function nextNonSpaceIndex(lane: string, after: number): number {
     if (lane[i] !== " ") return i;
   }
   return -1;
+}
+
+/** Ignore trailing/leading spaces so width matches drawn forks only. */
+function laneExtent(rows: GitGraphRow[]): { min: number; max: number } {
+  let min = Infinity;
+  let max = -Infinity;
+  for (const row of rows) {
+    for (let i = 0; i < row.lane.length; i++) {
+      if (row.lane[i] !== " ") {
+        min = Math.min(min, i);
+        max = Math.max(max, i);
+      }
+    }
+  }
+  if (!Number.isFinite(min) || !Number.isFinite(max)) {
+    return { min: 0, max: 0 };
+  }
+  return { min, max };
 }
 
 function elbowPath(
@@ -102,10 +121,6 @@ function elbowPath(
   ].join(" ");
 }
 
-function maxLaneChars(rows: GitGraphRow[]): number {
-  return rows.reduce((max, row) => Math.max(max, row.lane.length), 0);
-}
-
 function estimateCommitRowHeight(
   commit: GitGraphCommit,
   markers?: { currentCommit: string | null; remoteCommit: string | null },
@@ -121,6 +136,7 @@ function estimateCommitRowHeight(
 function buildRowGeometry(
   lane: string,
   height: number,
+  origin: number,
   opts: {
     hasCommit: boolean;
     hasPrev: boolean;
@@ -130,12 +146,13 @@ function buildRowGeometry(
   const segments: GraphSegment[] = [];
   let node: GraphRowNode | null = null;
   const nodeY = opts.hasCommit ? TITLE_NODE_OFFSET : height / 2;
+  const at = (i: number) => xAt(i, origin);
 
   for (let i = 0; i < lane.length; i++) {
     const ch = lane[i];
     if (ch === " ") continue;
 
-    const x = xAt(i);
+    const x = at(i);
     const color = laneColor(charToCol(i));
 
     if (ch === "|") {
@@ -147,7 +164,7 @@ function buildRowGeometry(
       const j = nextNonSpaceIndex(lane, i);
       if (j >= 0) {
         segments.push({
-          d: `M ${x} ${nodeY} L ${xAt(j)} ${nodeY}`,
+          d: `M ${x} ${nodeY} L ${at(j)} ${nodeY}`,
           color,
         });
       }
@@ -155,7 +172,7 @@ function buildRowGeometry(
       const j = lastNonSpaceIndex(lane, i);
       if (j >= 0) {
         segments.push({
-          d: `M ${xAt(j)} ${nodeY} L ${x} ${nodeY}`,
+          d: `M ${at(j)} ${nodeY} L ${x} ${nodeY}`,
           color,
         });
       }
@@ -163,14 +180,14 @@ function buildRowGeometry(
       const j = lastNonSpaceIndex(lane, i + 1);
       const fromIdx = j >= 0 ? j : Math.max(0, i - 2);
       segments.push({
-        d: elbowPath(xAt(fromIdx), 0, x, height),
+        d: elbowPath(at(fromIdx), 0, x, height),
         color,
       });
     } else if (ch === "/") {
       const j = nextNonSpaceIndex(lane, i);
       const toIdx = j >= 0 ? j : Math.min(lane.length - 1, i + 2);
       segments.push({
-        d: elbowPath(x, 0, xAt(toIdx), height),
+        d: elbowPath(x, 0, at(toIdx), height),
         color,
       });
     } else if (ch === "*") {
@@ -207,12 +224,16 @@ export function buildGitGraphLayout(
     remoteCommit: opts?.remoteCommit ?? null,
   };
 
+  const { min: origin, max: lastCol } = laneExtent(rows);
+  const colCount = Math.max(lastCol - origin + 1, 1);
+  const width = colCount * CHAR_W + PAD_X * 2;
+
   const rowLayouts: GraphRowLayout[] = rows.map((row, index) => {
     const height = row.commit
       ? estimateCommitRowHeight(row.commit, markers)
       : CONNECTOR_ROW_H;
 
-    const { segments, node } = buildRowGeometry(row.lane, height, {
+    const { segments, node } = buildRowGeometry(row.lane, height, origin, {
       hasCommit: Boolean(row.commit),
       hasPrev: index > 0,
       hasNext: index < rows.length - 1,
@@ -227,8 +248,6 @@ export function buildGitGraphLayout(
       node,
     };
   });
-
-  const width = Math.max(maxLaneChars(rows), 2) * CHAR_W + PAD_X * 2;
 
   return {
     width,

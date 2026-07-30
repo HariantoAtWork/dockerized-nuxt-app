@@ -41,13 +41,6 @@ const actionsDisabled = computed(
     unpinning.value,
 );
 
-/** Keep lane column narrow in the side panel; SVG scales via viewBox. */
-const MAX_LANE_W = 96;
-
-function laneDisplayWidth(layoutWidth: number): number {
-  return Math.min(layoutWidth, MAX_LANE_W);
-}
-
 function nodeLeftPercent(cx: number, layoutWidth: number): string {
   return `${(cx / layoutWidth) * 100}%`;
 }
@@ -131,13 +124,11 @@ watch(
         ]"
         :style="{ zIndex: idx + 1 }"
       >
-        <div
-          class="lane-cell"
-          :style="{ width: `${laneDisplayWidth(layout.width)}px` }"
-          aria-hidden="true"
-        >
+        <div class="lane-cell" aria-hidden="true">
           <svg
             class="lane-svg"
+            :width="layout.width"
+            :height="row.height"
             :viewBox="`0 0 ${layout.width} ${row.height}`"
             preserveAspectRatio="none"
           >
@@ -269,7 +260,9 @@ watch(
 
 .row-item {
   display: grid;
+  /* lane grows with forks; content fills the rest */
   grid-template-columns: auto minmax(0, 1fr);
+  grid-template-areas: "lane content";
   align-items: stretch;
   box-sizing: border-box;
   border-bottom: 1px solid rgba(16, 36, 31, 0.06);
@@ -292,18 +285,16 @@ watch(
 }
 
 .lane-cell {
+  grid-area: lane;
   position: relative;
-  flex-shrink: 0;
+  box-sizing: border-box;
   background: #eef1ef;
-  border-right: 1px dashed rgba(16, 36, 31, 0.14);
-  min-height: 100%;
+  /* inset so the divider does not shift the SVG off-centre */
+  box-shadow: inset -1px 0 0 rgba(16, 36, 31, 0.14);
 }
 
 .lane-svg {
-  position: absolute;
-  inset: 0;
   display: block;
-  width: 100%;
   height: 100%;
 }
 
@@ -332,14 +323,14 @@ watch(
 }
 
 .content {
+  grid-area: content;
   min-width: 0;
-  width: 100%;
-  padding: 0.55rem 0.7rem 0.55rem 0.6rem;
+  padding: 0.55rem 0.6rem;
   background: #f7f9f8;
 }
 
 .connector-pad {
-  width: 100%;
+  grid-area: content;
 }
 
 .node-current .content,
@@ -364,6 +355,7 @@ watch(
   line-height: 1.3;
   font-weight: 600;
   overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .meta {
