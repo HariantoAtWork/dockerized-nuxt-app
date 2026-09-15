@@ -69,7 +69,7 @@ async function main() {
 
   async function executeBuildPhase(opts: {
     forceBuild: boolean;
-  }): Promise<void> {
+  }): Promise<{ built: boolean }> {
     lastError = null;
     await clearBuildFlag(cfg);
     const sync = await syncGitRepository(cfg, log);
@@ -77,12 +77,13 @@ async function main() {
 
     if (!shouldBuild) {
       await touchBuildFlag(cfg);
-      return;
+      return { built: false };
     }
 
     await runInstallAndBuild(cfg, cfg.githubRepo, log);
     await touchBuildFlag(cfg);
     lastBuildAt = new Date().toISOString();
+    return { built: true };
   }
 
   async function rebuildAndRestart(label: string): Promise<void> {
@@ -223,21 +224,39 @@ async function main() {
   }
 
   try {
-    phase = "syncing";
-    await executeBuildPhase({ forceBuild: false });
+    const serverEntryPath = `${cfg.appOutput}/server/index.mjs`;
+    // Serve a previous build immediately while sync/build runs (persistent /app volume).
+    if (isFile(serverEntryPath)) {
+      log.info(
+        "Server entry already present; starting app while sync/build runs...",
+      );
+      phase = "running";
+      await app.start();
+    } else {
+      phase = "syncing";
+    }
+
+    const { built } = await executeBuildPhase({ forceBuild: false });
     await waitForRunnable(cfg);
     phase = "running";
-    await app.start();
+    // Restart after a real build so nodemon picks up a complete output tree.
+    // If we already started early and nothing was rebuilt, leave the process alone.
+    if (built || !app.isRunning()) {
+      await app.stop();
+      await app.start();
+    }
 
     stopWatcher = startCommitWatcher(cfg, log, async () => {
       await mutex.runExclusive(async () => {
         phase = "building";
         try {
-          await executeBuildPhase({ forceBuild: false });
+          const result = await executeBuildPhase({ forceBuild: false });
           await waitForRunnable(cfg);
           phase = "running";
-          await app.stop();
-          await app.start();
+          if (result.built || !app.isRunning()) {
+            await app.stop();
+            await app.start();
+          }
         } catch (e) {
           lastError = e instanceof Error ? e.message : String(e);
           log.error(lastError);
