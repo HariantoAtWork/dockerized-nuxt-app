@@ -47,14 +47,17 @@ docker volume create bun-cache
 docker volume create pnpm-store
 ```
 
-### 3. Start
+### 3. Compose files and start
 
 ```bash
-# Development (builds local Dockerfile)
-docker compose up -d
+cp docker-compose.yml.example docker-compose.yml
+# Optional Cloudflare tunnel bridge:
+# cp docker-compose.override.yml.example docker-compose.override.yml
 
-# Production (pulls DOCKER_HUB_IMAGE)
-docker compose -f docker-compose.production.yml up -d
+cp .env.example .env   # set GITHUB_REPO_URL (and DOCKER_HUB_IMAGE)
+cp .env.app.example .env.app
+
+docker compose up -d
 ```
 
 - App: `http://localhost:3300`
@@ -81,7 +84,7 @@ See [.wiki/Architecture.md](.wiki/Architecture.md) and [.wiki/Volumes-and-paths.
 | Variable | Description | Required |
 |----------|-------------|----------|
 | `GITHUB_REPO_URL` | Repo URL (with token if private) | Yes |
-| `DOCKER_HUB_IMAGE` | Image name for production compose | Production |
+| `DOCKER_HUB_IMAGE` | Image name for `docker compose up` | Yes (for pull) |
 | `GIT_BRANCH` | Initial branch if none persisted | No (`main`) |
 | `ORCHESTRATOR_STATE_DIR` | CI state directory | No (`/var/lib/orchestrator`) |
 | `ADMIN_TOKEN` | Protects rebuild / restart / branch switch | No |
@@ -126,12 +129,13 @@ bun run start                # orchestrator in another terminal
 ## Deployment
 
 ```bash
+# Image build / Hub push
+./dc.sh build
+./dc.sh push
+
+# Run (after copying *.example compose files and .env)
 docker compose up -d
 docker compose logs -f nuxt-app
-
-docker build -t your-registry/nuxt-app:latest .
-docker push your-registry/nuxt-app:latest
-docker compose -f docker-compose.production.yml up -d
 ```
 
 ## Troubleshooting

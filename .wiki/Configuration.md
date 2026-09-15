@@ -20,7 +20,7 @@
 | `ADMIN_TOKEN` | unset | Protects mutating admin APIs |
 | `WATCH_INTERVAL_MS` | `60000` | Git poll interval |
 | `VERBOSE_LOGGING` | `true` | |
-| `DOCKER_HUB_IMAGE` | — | Production compose image name |
+| `DOCKER_HUB_IMAGE` | — | Image pulled by `docker-compose.yml` |
 
 ## Application (`.env.app`)
 

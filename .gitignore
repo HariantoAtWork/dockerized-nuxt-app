@@ -2,6 +2,8 @@
 .env.*
 !.env.example
 !*.example
+docker-compose.yml
+docker-compose.override.yml
 data/
 .data/
 node_modules/
