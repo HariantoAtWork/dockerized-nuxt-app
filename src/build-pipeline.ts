@@ -9,6 +9,11 @@ type PackageJson = {
 
 async function readPackageJson(repoRoot: string): Promise<PackageJson> {
   const path = `${repoRoot}/package.json`;
+  if (!isFile(path)) {
+    throw new Error(
+      `${path} not found; waiting for a complete checkout before build`,
+    );
+  }
   const raw = await Bun.file(path).text();
   return JSON.parse(raw) as PackageJson;
 }

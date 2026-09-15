@@ -148,6 +148,22 @@ export async function syncGitRepository(
     }
   };
 
+  /** .git present but working tree empty/partial (e.g. volume wiped except .git). */
+  const restoreWorkingTreeIfIncomplete = async (): Promise<boolean> => {
+    if (isFile(`${repo}/package.json`)) return false;
+    log.warn(
+      "Repository .git present but package.json missing; restoring working tree...",
+    );
+    await checkoutTrackedBranch(cfg, log);
+    if (!isFile(`${repo}/package.json`)) {
+      throw new Error(
+        `${repo}/package.json still missing after checkout; will retry`,
+      );
+    }
+    buildNeeded = true;
+    return true;
+  };
+
   if (isDirectory(repo) && isDirectory(`${repo}/.git`)) {
     log.info(`Repository exists. Tracking ${remoteRef}...`);
     currentCommit = (await runCmd(["git", "rev-parse", "HEAD"], repo)).stdout
@@ -155,6 +171,13 @@ export async function syncGitRepository(
     await writeTextFile(cfg.currentCommitFile, `${currentCommit}\n`);
 
     await runCmd(["git", "fetch", "origin"], repo);
+
+    if (await restoreWorkingTreeIfIncomplete()) {
+      currentCommit = (
+        await runCmd(["git", "rev-parse", "HEAD"], repo)
+      ).stdout.trim();
+      await writeTextFile(cfg.currentCommitFile, `${currentCommit}\n`);
+    }
 
     const remoteProbe = await runCmd(["git", "rev-parse", remoteRef], repo, {
       throwOnError: false,

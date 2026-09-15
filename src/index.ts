@@ -45,6 +45,8 @@ async function waitForRunnable(cfg: ReturnType<typeof loadConfig>): Promise<void
   }
 }
 
+const STARTUP_RETRY_MS = 5_000;
+
 async function main() {
   const cfg = loadConfig();
   if (!cfg.githubRepoUrl) {
@@ -80,6 +82,7 @@ async function main() {
       return { built: false };
     }
 
+    phase = "building";
     await runInstallAndBuild(cfg, cfg.githubRepo, log);
     await touchBuildFlag(cfg);
     lastBuildAt = new Date().toISOString();
@@ -98,7 +101,7 @@ async function main() {
     } catch (e) {
       lastError = e instanceof Error ? e.message : String(e);
       log.error(lastError);
-      phase = "idle";
+      phase = app.isRunning() ? "running" : "idle";
       throw e;
     }
   }
@@ -223,16 +226,16 @@ async function main() {
     process.exit(0);
   }
 
-  try {
+  async function bootOnce(): Promise<void> {
     const serverEntryPath = `${cfg.appOutput}/server/index.mjs`;
     // Serve a previous build immediately while sync/build runs (persistent /app volume).
-    if (isFile(serverEntryPath)) {
+    if (isFile(serverEntryPath) && !app.isRunning()) {
       log.info(
         "Server entry already present; starting app while sync/build runs...",
       );
       phase = "running";
       await app.start();
-    } else {
+    } else if (!app.isRunning()) {
       phase = "syncing";
     }
 
@@ -245,30 +248,45 @@ async function main() {
       await app.stop();
       await app.start();
     }
-
-    stopWatcher = startCommitWatcher(cfg, log, async () => {
-      await mutex.runExclusive(async () => {
-        phase = "building";
-        try {
-          const result = await executeBuildPhase({ forceBuild: false });
-          await waitForRunnable(cfg);
-          phase = "running";
-          if (result.built || !app.isRunning()) {
-            await app.stop();
-            await app.start();
-          }
-        } catch (e) {
-          lastError = e instanceof Error ? e.message : String(e);
-          log.error(lastError);
-          phase = "idle";
-        }
-      });
-    });
-  } catch (e) {
-    lastError = e instanceof Error ? e.message : String(e);
-    log.error(`Fatal startup error: ${lastError}`);
-    process.exit(1);
   }
+
+  // Keep the orchestrator (and admin UI) alive: retry sync/build until ready.
+  for (;;) {
+    try {
+      await mutex.runExclusive(async () => {
+        await bootOnce();
+      });
+      lastError = null;
+      break;
+    } catch (e) {
+      lastError = e instanceof Error ? e.message : String(e);
+      log.error(
+        `Not ready yet (${lastError}); retrying in ${STARTUP_RETRY_MS / 1000}s…`,
+      );
+      phase = app.isRunning() ? "running" : "idle";
+      await Bun.sleep(STARTUP_RETRY_MS);
+    }
+  }
+
+  stopWatcher = startCommitWatcher(cfg, log, async () => {
+    await mutex.runExclusive(async () => {
+      phase = "building";
+      try {
+        const result = await executeBuildPhase({ forceBuild: false });
+        await waitForRunnable(cfg);
+        phase = "running";
+        if (result.built || !app.isRunning()) {
+          await app.stop();
+          await app.start();
+        }
+        lastError = null;
+      } catch (e) {
+        lastError = e instanceof Error ? e.message : String(e);
+        log.error(lastError);
+        phase = app.isRunning() ? "running" : "idle";
+      }
+    });
+  });
 }
 
 void main();
