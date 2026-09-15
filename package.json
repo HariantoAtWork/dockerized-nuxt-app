@@ -5,7 +5,12 @@
   "scripts": {
     "start": "bun run src/index.ts",
     "typecheck": "bun x tsc --noEmit",
-    "build:admin": "cd admin-ui && bun run build && rm -rf ../static && cp -r dist ../static"
+    "build:admin": "cd admin-ui && bun run build && rm -rf ../static && cp -r dist ../static",
+    "docker:build": "docker compose -f _build.yml build",
+    "docker:push": "docker compose -f _push.yml build --no-cache --push",
+    "docker:up": "docker compose up -d",
+    "docker:down": "docker compose down",
+    "docker:logs": "docker compose logs -f nuxt-app"
   },
   "devDependencies": {
     "@types/bun": "1.2.16",

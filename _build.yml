@@ -1,0 +1,7 @@
+# docker compose -f _build.yml build
+services:
+  nuxt-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: harianto/dockerized-nuxt-app:latest
