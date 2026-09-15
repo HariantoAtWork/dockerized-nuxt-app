@@ -16,7 +16,7 @@
 | `APP_OUTPUT` | `/app` | Served Nitro output (nodemon watch + `server/index.mjs`) |
 | `APP_BUILD` | `/app` | Path checked for a complete served build |
 | `ADMIN_BIND` | `0.0.0.0` | |
-| `ADMIN_PORT` | `9090` | Host often `9091` |
+| `ADMIN_PORT` | `9090` | Compose host default also `9090` (`ADMIN_HOST_PORT`) |
 | `ADMIN_TOKEN` | unset | Protects mutating admin APIs |
 | `WATCH_INTERVAL_MS` | `60000` | Git poll interval |
 | `VERBOSE_LOGGING` | `true` | |

@@ -61,7 +61,7 @@ That split keeps a `git clean` from wiping orchestrator state, and keeps app upl
 
 ## Admin dashboard
 
-The dashboard listens on the host (default `127.0.0.1:9091`) and talks to a small HTTP API:
+The dashboard listens on the host (default `127.0.0.1:9090`) and talks to a small HTTP API:
 
 - status signals — build entry present, nodemon running, current branch and commit
 - logs

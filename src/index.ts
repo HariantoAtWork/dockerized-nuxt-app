@@ -211,7 +211,7 @@ async function main() {
   });
 
   log.info(
-    `Admin dashboard at http://${cfg.adminBind}:${cfg.adminPort}/ (container pid ${process.pid}; host loopback http://127.0.0.1:9091/ when compose maps 9091:9090)`,
+    `Admin dashboard at http://${cfg.adminBind}:${cfg.adminPort}/ (container pid ${process.pid})`,
   );
 
   process.on("SIGINT", () => void shutdown());

@@ -61,7 +61,7 @@ docker compose up -d
 ```
 
 - App: `http://localhost:3300`
-- Admin: `http://127.0.0.1:9091/`
+- Admin: `http://127.0.0.1:9090/`
 
 ## Architecture (summary)
 
@@ -108,12 +108,12 @@ Full list: [.wiki/Configuration.md](.wiki/Configuration.md).
 - APIs: `/api/status`, `/api/logs`, `/api/branches`, `POST /api/branch`, `POST /api/rebuild`, `POST /api/restart-app`
 
 ```bash
-curl -s http://127.0.0.1:9091/api/status
-curl -s http://127.0.0.1:9091/api/branches
+curl -s http://127.0.0.1:9090/api/status
+curl -s http://127.0.0.1:9090/api/branches
 curl -s -X POST -H "Authorization: Bearer $ADMIN_TOKEN" \
   -H "content-type: application/json" \
   -d '{"branch":"feature-x"}' \
-  http://127.0.0.1:9091/api/branch
+  http://127.0.0.1:9090/api/branch
 ```
 
 Details: [.wiki/Admin-API.md](.wiki/Admin-API.md).

@@ -1,6 +1,6 @@
 # Admin API and dashboard
 
-Dashboard: **http://127.0.0.1:9091/** (compose maps `127.0.0.1:9091:9090`).
+Dashboard: **http://127.0.0.1:9090/** (compose maps `127.0.0.1:9090:9090`).
 
 When `ADMIN_TOKEN` is set, mutating routes need `Authorization: Bearer <token>` or `?token=` on the URL.
 
@@ -32,12 +32,12 @@ Full JSON status remains under a collapsible panel; logs poll every 10s.
 ### Example
 
 ```bash
-curl -s http://127.0.0.1:9091/api/status
-curl -s http://127.0.0.1:9091/api/branches
+curl -s http://127.0.0.1:9090/api/status
+curl -s http://127.0.0.1:9090/api/branches
 curl -s -X POST -H "Authorization: Bearer $ADMIN_TOKEN" \
   -H "content-type: application/json" \
   -d '{"branch":"feature-x"}' \
-  http://127.0.0.1:9091/api/branch
+  http://127.0.0.1:9090/api/branch
 ```
 
 Branch switches persist to `/var/lib/orchestrator/git_branch` and the commit watcher follows the new branch.
