@@ -18,12 +18,37 @@ async function readPackageJson(repoRoot: string): Promise<PackageJson> {
   return JSON.parse(raw) as PackageJson;
 }
 
-async function waitForOutput(appOutput: string, log: RingLog): Promise<void> {
-  const serverMjs = `${appOutput}/server/index.mjs`;
-  log.info(`Waiting for ${serverMjs}...`);
+/**
+ * Nuxt/Nitro writes `<repo>/.output` by default. Publish once into APP_OUTPUT (/app).
+ * No watch/debounce — single rsync after the source entry exists.
+ */
+async function publishBuildOutput(
+  cfg: AppConfig,
+  repoRoot: string,
+  log: RingLog,
+): Promise<void> {
+  const nitroDefault = `${repoRoot}/.output`;
+  const srcEntry = `${nitroDefault}/server/index.mjs`;
+  const dest = cfg.appOutput;
+  const destEntry = `${dest}/server/index.mjs`;
+
+  log.info(`Waiting for ${srcEntry}...`);
   for (;;) {
-    if (isDirectory(appOutput) && isFile(serverMjs)) break;
+    if (isFile(srcEntry)) break;
     await Bun.sleep(2000);
+  }
+
+  if (nitroDefault !== dest) {
+    log.info(`Publishing ${nitroDefault}/ → ${dest}/`);
+    await runCmd(["mkdir", "-p", dest], "/");
+    await runCmd(
+      ["rsync", "-a", "--delete", `${nitroDefault}/`, `${dest}/`],
+      "/",
+    );
+  }
+
+  if (!isDirectory(dest) || !isFile(destEntry)) {
+    throw new Error(`Build finished but ${destEntry} is missing`);
   }
   log.info("Build output ready.");
 }
@@ -51,5 +76,5 @@ export async function runInstallAndBuild(
     );
   }
 
-  await waitForOutput(cfg.appOutput, log);
+  await publishBuildOutput(cfg, repoRoot, log);
 }

@@ -18,26 +18,27 @@ ENV BETTER_AUTH_TELEMETRY=0
 ENV BETTER_AUTH_TELEMETRY_DEBUG=0
 
 # Environment variables #2 (runtime paths)
-# /app = cloned Nuxt repo + .output
+# /git = cloned Nuxt repo (source)
+# /app = served Nitro output (published from /git/.output after build)
 # /data = reserved for the Nuxt app
 # /var/lib/orchestrator = Docker CI / orchestrator state (volume-mounted)
 ENV APP_ROOT="/app"
-ENV GITHUB_REPO="/app"
-ENV APP_BUILD="${GITHUB_REPO}/.output"
-ENV APP_OUTPUT="${APP_ROOT}/.output"
+ENV GITHUB_REPO="/git"
+ENV APP_BUILD="/app"
+ENV APP_OUTPUT="/app"
 ENV ORCHESTRATOR_STATE_DIR="/var/lib/orchestrator"
 ENV CURRENT_COMMIT_FILE="${ORCHESTRATOR_STATE_DIR}/current_commit"
 ENV LAST_COMMIT_FILE="${ORCHESTRATOR_STATE_DIR}/last_commit"
 ENV BUILD_COMPLETE_FLAG="${ORCHESTRATOR_STATE_DIR}/build-complete.flag"
 ENV GIT_BRANCH_FILE="${ORCHESTRATOR_STATE_DIR}/git_branch"
-ENV PROJECT_BUILD_SCRIPT="${GITHUB_REPO}/scripts/build.sh"
+ENV PROJECT_BUILD_SCRIPT="/git/scripts/build.sh"
 
 # Admin HTTP (orchestrator dashboard). Use ADMIN_TOKEN when exposing a port.
 ENV ADMIN_BIND="0.0.0.0"
 ENV ADMIN_PORT="9090"
 
 # git/rsync for clone; wget for healthcheck; curl/bash/unzip for official Bun install
-# nodemon watches .output and runs .output/server/index.mjs
+# nodemon watches APP_OUTPUT and runs server/index.mjs
 RUN apk add --no-cache git wget rsync curl bash unzip \
   && curl -fsSL https://bun.com/install | bash \
   && ln -sf /root/.bun/bin/bun /usr/local/bin/bun \

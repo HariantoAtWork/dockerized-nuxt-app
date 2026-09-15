@@ -8,7 +8,7 @@ When `ADMIN_TOKEN` is set, mutating routes need `Authorization: Bearer <token>` 
 
 The dashboard shows:
 
-- **Build entry** — whether `/app/.output/server/index.mjs` exists (`serverEntryExists` / `serverEntryPath`)
+- **Build entry** — whether `/app/server/index.mjs` exists (`serverEntryExists` / `serverEntryPath`)
 - **Nodemon** — whether the supervised process is running (`appRunning` / `appPid`)
 - Combined readiness label (live / waiting / stopped / degraded)
 - **Deployed commit** — short SHA, subject line (`currentCommit` / `currentCommitMessage`), and remote tip when ahead

@@ -6,7 +6,7 @@ export type AppConfig = {
   githubRepoUrl: string;
   appOutput: string;
   appBuildDir: string;
-  /** Persistent orchestrator CI state (outside /app clone and Nuxt /data). */
+  /** Persistent orchestrator CI state (outside /git clone and Nuxt /data). */
   orchestratorStateDir: string;
   buildCompleteFlag: string;
   currentCommitFile: string;
@@ -47,8 +47,9 @@ function readPersistedBranch(path: string): string | null {
 
 export function loadConfig(): AppConfig {
   const githubRepoUrl = process.env.GITHUB_REPO_URL ?? "";
+  // /git = clone; /app = served Nitro output (published from repo/.output after build)
   const appRoot = process.env.APP_ROOT ?? "/app";
-  const githubRepo = process.env.GITHUB_REPO ?? appRoot;
+  const githubRepo = process.env.GITHUB_REPO ?? "/git";
   const orchestratorStateDir =
     process.env.ORCHESTRATOR_STATE_DIR ?? "/var/lib/orchestrator";
 
@@ -65,8 +66,8 @@ export function loadConfig(): AppConfig {
     appRoot,
     githubRepo,
     githubRepoUrl,
-    appOutput: process.env.APP_OUTPUT ?? `${appRoot}/.output`,
-    appBuildDir: process.env.APP_BUILD ?? `${githubRepo}/.output`,
+    appOutput: process.env.APP_OUTPUT ?? "/app",
+    appBuildDir: process.env.APP_BUILD ?? "/app",
     orchestratorStateDir,
     buildCompleteFlag:
       process.env.BUILD_COMPLETE_FLAG ??

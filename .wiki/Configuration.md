@@ -11,9 +11,10 @@
 | `CURRENT_COMMIT_FILE` | `$ORCHESTRATOR_STATE_DIR/current_commit` | |
 | `LAST_COMMIT_FILE` | `$ORCHESTRATOR_STATE_DIR/last_commit` | |
 | `BUILD_COMPLETE_FLAG` | `$ORCHESTRATOR_STATE_DIR/build-complete.flag` | |
-| `APP_ROOT` | `/app` | Clone + output root / nodemon `cwd` |
-| `GITHUB_REPO` | `/app` | Same as app root by default |
-| `APP_OUTPUT` | `$APP_ROOT/.output` | Nodemon watch dir |
+| `APP_ROOT` | `/app` | Serve-related root (defaults match `APP_OUTPUT`) |
+| `GITHUB_REPO` | `/git` | Cloned Nuxt repository |
+| `APP_OUTPUT` | `/app` | Served Nitro output (nodemon watch + `server/index.mjs`) |
+| `APP_BUILD` | `/app` | Path checked for a complete served build |
 | `ADMIN_BIND` | `0.0.0.0` | |
 | `ADMIN_PORT` | `9090` | Host often `9091` |
 | `ADMIN_TOKEN` | unset | Protects mutating admin APIs |

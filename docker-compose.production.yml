@@ -20,6 +20,7 @@ services:
       - .env.app
     volumes:
       # Persistent storage for repository, build, and data
+      - ./data/git:/git
       - ./data/app:/app
       - ./data/data:/data
       # Orchestrator CI state (branch, commits, build flag) — not Nuxt /data

@@ -7,7 +7,7 @@ Project documentation for the Dockerised Nuxt 4 + Bun CI orchestrator.
 | Page | Topic |
 |------|--------|
 | [Architecture](Architecture.md) | Process flow, image layout, runtimes |
-| [Volumes and paths](Volumes-and-paths.md) | `/app`, `/data`, `/var/lib/orchestrator` |
+| [Volumes and paths](Volumes-and-paths.md) | `/git`, `/app`, `/data`, `/var/lib/orchestrator` |
 | [Admin API and dashboard](Admin-API.md) | Status signals, branch switch, rebuild |
 | [Configuration](Configuration.md) | Environment variables and defaults |
 

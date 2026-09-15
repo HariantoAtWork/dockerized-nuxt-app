@@ -9,10 +9,9 @@ export type AppRunner = {
   getPid: () => number | null;
 };
 
-const SERVER_ENTRY = ".output/server/index.mjs";
-
 export function createAppRunner(cfg: AppConfig, log: RingLog): AppRunner {
   let child: ReturnType<typeof Bun.spawn> | null = null;
+  const serverEntry = `${cfg.appOutput}/server/index.mjs`;
 
   async function stopQuiet(): Promise<void> {
     if (!child) return;
@@ -40,10 +39,9 @@ export function createAppRunner(cfg: AppConfig, log: RingLog): AppRunner {
   }
 
   async function waitForServerEntry(): Promise<void> {
-    const absoluteEntry = `${cfg.appOutput}/server/index.mjs`;
-    if (isFile(absoluteEntry)) return;
-    log.info(`Waiting for ${SERVER_ENTRY} before nodemon...`);
-    while (!isFile(absoluteEntry)) {
+    if (isFile(serverEntry)) return;
+    log.info(`Waiting for ${serverEntry} before nodemon...`);
+    while (!isFile(serverEntry)) {
       await Bun.sleep(2000);
     }
   }
@@ -55,18 +53,18 @@ export function createAppRunner(cfg: AppConfig, log: RingLog): AppRunner {
     start: async () => {
       await stopQuiet();
       await waitForServerEntry();
-      log.info(`Starting nodemon for ${SERVER_ENTRY}...`);
+      log.info(`Starting nodemon for ${serverEntry}...`);
       child = Bun.spawn(
         [
           "nodemon",
           "--watch",
           cfg.appOutput,
           "--cwd",
-          cfg.appRoot,
-          SERVER_ENTRY,
+          cfg.appOutput,
+          serverEntry,
         ],
         {
-          cwd: cfg.appRoot,
+          cwd: cfg.appOutput,
           stdout: "inherit",
           stderr: "inherit",
           env: process.env,

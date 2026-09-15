@@ -8,9 +8,9 @@ Deeper operational docs live in [`.wiki/`](.wiki/Home.md).
 
 - **Automated Git deployment** — clone/update from GitHub, including on-the-fly **branch switch** from the admin UI
 - **Smart builds** — rebuild when commits move (or output is missing): `bun install` + `bun run ci` / `bun run build`
-- **Process supervision** — nodemon watches `.output` and runs `.output/server/index.mjs` (gated until the entry exists)
+- **Process supervision** — nodemon watches `/app` and runs `/app/server/index.mjs` (gated until the entry exists)
 - **Admin dashboard** — runtime signals (build entry + nodemon), branch deploy, logs, rebuild/restart
-- **Separated volumes** — `/app` clone, `/data` Nuxt app data, `/var/lib/orchestrator` CI state
+- **Separated volumes** — `/git` clone, `/app` served build, `/data` Nuxt app data, `/var/lib/orchestrator` CI state
 - **Health checks** — compose healthcheck on port 3000
 
 ## Prerequisites
@@ -65,11 +65,12 @@ docker compose -f docker-compose.production.yml up -d
 | Path | Role |
 |------|------|
 | `/opt/orchestrator` | Orchestrator + static admin UI (image) |
-| `/app` | Cloned repo + `.output` (`./data/app`) |
+| `/git` | Cloned repo (`./data/git`) |
+| `/app` | Served Nitro output (`./data/app`) |
 | `/data` | Reserved for Nuxt app data (`./data/data`) |
 | `/var/lib/orchestrator` | CI state: branch, commits, build flag (`./data/orchestrator`) |
 
-**Flow:** git sync → `bun install` + `ci`/`build` → wait for build flag + `index.mjs` → nodemon → poll active branch.
+**Flow:** git sync → `bun install` + `ci`/`build` → publish `.output` → `/app` → wait for build flag + `index.mjs` → nodemon → poll active branch.
 
 Bun is installed via the official install script and upgraded to **canary** in the image. Nodemon remains the server supervisor (not `bun --watch`).
 
@@ -91,7 +92,8 @@ Full list: [.wiki/Configuration.md](.wiki/Configuration.md).
 
 ### Volumes
 
-- `./data/app:/app` — clone + build output
+- `./data/git:/git` — cloned repository
+- `./data/app:/app` — served build output
 - `./data/data:/data` — Nuxt application data only
 - `./data/orchestrator:/var/lib/orchestrator` — orchestrator CI state
 - `bun-cache`, `pnpm-store` — package caches
@@ -139,13 +141,13 @@ docker compose -f docker-compose.production.yml up -d
 3. **App not starting**
    ```bash
    docker compose exec nuxt-app ls -la /var/lib/orchestrator/build-complete.flag
-   docker compose exec nuxt-app ls -la /app/.output/server/index.mjs
+   docker compose exec nuxt-app ls -la /app/server/index.mjs
    ```
 4. **Wrong branch** — check `/api/status` → `gitBranch`, or `/var/lib/orchestrator/git_branch`; switch from the dashboard.
 
 ```bash
 docker compose exec nuxt-app sh
-cd /app && git status
+cd /git && git status
 ```
 
 ## Build expectations
