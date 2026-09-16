@@ -54,6 +54,9 @@ async function checkoutTrackedBranch(
   log.info(`Checking out ${remoteRef}...`);
   await runCmd(["git", "fetch", "origin"], repo);
   await runCmd(["git", "checkout", "-B", branch, remoteRef], repo);
+  // Force files onto disk — needed after moving .git into an empty volume mount
+  // where HEAD already matches and checkout alone may not materialise the tree.
+  await runCmd(["git", "reset", "--hard", "HEAD"], repo);
   await runCmd(["git", "clean", "-fd"], repo);
 }
 
@@ -70,6 +73,7 @@ export async function checkoutPinnedCommit(
     await runCmd(["git", "rev-parse", "--verify", `${safe}^{commit}`], repo)
   ).stdout.trim();
   await runCmd(["git", "checkout", "--detach", resolved], repo);
+  await runCmd(["git", "reset", "--hard", "HEAD"], repo);
   await runCmd(["git", "clean", "-fd"], repo);
   await writeTextFile(cfg.currentCommitFile, `${resolved}\n`);
   return resolved;
@@ -238,11 +242,20 @@ export async function syncGitRepository(
       markBuildIfMissingOutput();
     }
   } else if (isDirectory(repo) && !isDirectory(`${repo}/.git`)) {
-    log.info("Folder exists without .git; recovering repository...");
-    const temp = `/tmp/orch-git-recovery-${process.pid}`;
-    await runCmd(["git", "clone", cfg.githubRepoUrl, temp], "/");
-    await runCmd(["sh", "-c", `mv "${temp}/.git" "${repo}/.git"`], "/");
-    await runCmd(["rm", "-rf", temp], "/");
+    // Compose bind mounts create an empty /git dir — clone into it directly.
+    const listing = (
+      await runCmd(["ls", "-A", repo], "/", { throwOnError: false })
+    ).stdout.trim();
+    if (!listing) {
+      log.info("Empty repo directory; cloning repository for the first time...");
+      await runCmd(["git", "clone", cfg.githubRepoUrl, repo], "/");
+    } else {
+      log.info("Folder exists without .git; recovering repository...");
+      const temp = `/tmp/orch-git-recovery-${process.pid}`;
+      await runCmd(["git", "clone", cfg.githubRepoUrl, temp], "/");
+      await runCmd(["sh", "-c", `mv "${temp}/.git" "${repo}/.git"`], "/");
+      await runCmd(["rm", "-rf", temp], "/");
+    }
     await checkoutTrackedBranch(cfg, log);
     buildNeeded = true;
     currentCommit = (
