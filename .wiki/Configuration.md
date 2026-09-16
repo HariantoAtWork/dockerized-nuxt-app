@@ -24,7 +24,7 @@
 
 ## Application (`.env.app`)
 
-Passed into the container for the **cloned Nuxt app** (and shared process env). Keep Nuxt data under `/data`, not under orchestrator state.
+Passed into the container for the **cloned Nuxt app** (and shared process env). The orchestrator does not read these variables — put only what your Nuxt app needs. Keep Nuxt data under `/data`, not under orchestrator state. See `.env.app.example`.
 
 ## Cloned app scripts
 

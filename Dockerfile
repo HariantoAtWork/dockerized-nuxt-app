@@ -14,8 +14,6 @@ FROM node:22-alpine
 
 # Environment variables #1
 ENV CI=1
-ENV BETTER_AUTH_TELEMETRY=0
-ENV BETTER_AUTH_TELEMETRY_DEBUG=0
 
 # Environment variables #2 (runtime paths)
 # /git = cloned Nuxt repo (source)
