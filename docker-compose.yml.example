@@ -18,6 +18,9 @@ services:
       NODE_ENV: production
       GITHUB_REPO_URL: ${GITHUB_REPO_URL}
     env_file:
+      # Orchestrator settings (ADMIN_TOKEN, GIT_BRANCH, …); also used for ${…} on host
+      - .env
+      # Cloned Nuxt app vars only — see .env.app.example
       - .env.app
     volumes:
       # Persistent storage for repository, build, and data
