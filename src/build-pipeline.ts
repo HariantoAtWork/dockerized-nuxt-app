@@ -67,13 +67,16 @@ export async function runInstallAndBuild(
   if (scripts.ci) {
     log.info("Running bun run ci...");
     await runCmd(["bun", "run", "ci"], repoRoot);
-  } else if (scripts.build) {
-    log.info("No scripts.ci; running bun run build...");
-    await runCmd(["bun", "run", "build"], repoRoot);
   } else {
-    throw new Error(
-      "package.json must define scripts.ci or scripts.build for container builds",
-    );
+    log.info("bun run ci: SKIPPED (no scripts.ci in package.json)");
+    if (scripts.build) {
+      log.info("Running bun run build...");
+      await runCmd(["bun", "run", "build"], repoRoot);
+    } else {
+      throw new Error(
+        "package.json must define scripts.ci or scripts.build for container builds",
+      );
+    }
   }
 
   await publishBuildOutput(cfg, repoRoot, log);
