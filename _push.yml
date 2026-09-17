@@ -1,10 +1,11 @@
 # docker compose -f _push.yml build --no-cache --push
 # Multi-arch cannot be loaded into the local Docker engine; use _build.yml for local images.
+# Dockerfile.platform runs Bun install/build on $BUILDPLATFORM (avoids QEMU SIGILL).
 services:
   nuxt-app:
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.platform
       platforms:
         - linux/amd64
         - linux/arm64

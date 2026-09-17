@@ -1,4 +1,5 @@
 # docker compose -f _build.yml build
+# Local/native image only. Multi-arch Hub pushes use _push.yml + Dockerfile.platform.
 services:
   nuxt-app:
     build:
