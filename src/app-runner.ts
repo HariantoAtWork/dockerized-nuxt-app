@@ -57,8 +57,10 @@ export function createAppRunner(cfg: AppConfig, log: RingLog): AppRunner {
       child = Bun.spawn(
         [
           "nodemon",
+          "--exec",
+          "bun",
           "--watch",
-          cfg.appOutput,
+          serverEntry,
           "--cwd",
           cfg.appOutput,
           serverEntry,
