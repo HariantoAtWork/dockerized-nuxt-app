@@ -63,6 +63,8 @@ export async function runInstallAndBuild(
 
   log.info("Running bun install...");
   await runCmd(["bun", "install"], repoRoot);
+  log.info("Running bun pm trust --all...");
+  await runCmd(["bun", "pm", "trust", "--all"], repoRoot);
 
   if (scripts.ci) {
     log.info("Running bun run ci...");
@@ -79,5 +81,6 @@ export async function runInstallAndBuild(
     }
   }
 
+  log.info("Running publishBuildOutput...");
   await publishBuildOutput(cfg, repoRoot, log);
 }
