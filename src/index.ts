@@ -23,6 +23,7 @@ import {
   syncGitRepository,
   touchBuildFlag,
 } from "./repo-sync.ts";
+import { deriveStatusLanes } from "./status-lanes.ts";
 import type { OrchestratorPhase, OrchestratorSnapshot } from "./types.ts";
 import { startCommitWatcher } from "./watcher.ts";
 
@@ -67,13 +68,23 @@ async function main() {
   let phase: OrchestratorPhase = "idle";
   let lastBuildAt: string | null = null;
   let lastError: string | null = null;
+  let lastErrorPhase: OrchestratorPhase | null = null;
   let stopWatcher: (() => void) | null = null;
+
+  function markError(e: unknown): string {
+    const msg = e instanceof Error ? e.message : String(e);
+    lastError = msg;
+    lastErrorPhase = phase;
+    return msg;
+  }
 
   async function executeBuildPhase(opts: {
     forceBuild: boolean;
   }): Promise<{ built: boolean }> {
     lastError = null;
+    lastErrorPhase = null;
     await clearBuildFlag(cfg);
+    phase = "syncing";
     const sync = await syncGitRepository(cfg, log);
     const shouldBuild = opts.forceBuild || sync.buildNeeded;
 
@@ -91,7 +102,6 @@ async function main() {
 
   async function rebuildAndRestart(label: string): Promise<void> {
     log.info(label);
-    phase = "building";
     try {
       await executeBuildPhase({ forceBuild: true });
       await waitForRunnable(cfg);
@@ -99,8 +109,8 @@ async function main() {
       await app.stop();
       await app.start();
     } catch (e) {
-      lastError = e instanceof Error ? e.message : String(e);
-      log.error(lastError);
+      const msg = markError(e);
+      log.error(msg);
       phase = app.isRunning() ? "running" : "idle";
       throw e;
     }
@@ -110,12 +120,25 @@ async function main() {
     const serverEntryPath = `${cfg.appOutput}/server/index.mjs`;
     const currentCommit = readCommitFile(cfg.currentCommitFile);
     const remoteCommit = readCommitFile(cfg.lastCommitFile);
+    const appRunning = app.isRunning();
+    const appPid = app.getPid();
+    const serverEntryExists = isFile(serverEntryPath);
     const [currentCommitMessage, remoteCommitMessage, pinnedCommit] =
       await Promise.all([
         commitSubject(cfg.githubRepo, currentCommit),
         commitSubject(cfg.githubRepo, remoteCommit),
         readPinnedCommit(cfg),
       ]);
+    const lanes = deriveStatusLanes({
+      phase,
+      lastError,
+      lastErrorPhase,
+      currentCommit,
+      serverEntryExists,
+      lastBuildAt,
+      appRunning,
+      appPid,
+    });
     return {
       phase,
       gitBranch: cfg.gitBranch,
@@ -126,12 +149,14 @@ async function main() {
       currentCommitMessage,
       remoteCommit,
       remoteCommitMessage,
-      appRunning: app.isRunning(),
-      appPid: app.getPid(),
-      serverEntryExists: isFile(serverEntryPath),
+      appRunning,
+      appPid,
+      serverEntryExists,
       serverEntryPath,
       lastBuildAt,
       lastError,
+      lastErrorPhase,
+      lanes,
       watchIntervalMs: cfg.watchIntervalMs,
     };
   }
@@ -257,11 +282,12 @@ async function main() {
         await bootOnce();
       });
       lastError = null;
+      lastErrorPhase = null;
       break;
     } catch (e) {
-      lastError = e instanceof Error ? e.message : String(e);
+      const msg = markError(e);
       log.error(
-        `Not ready yet (${lastError}); retrying in ${STARTUP_RETRY_MS / 1000}s…`,
+        `Not ready yet (${msg}); retrying in ${STARTUP_RETRY_MS / 1000}s…`,
       );
       phase = app.isRunning() ? "running" : "idle";
       await Bun.sleep(STARTUP_RETRY_MS);
@@ -270,7 +296,6 @@ async function main() {
 
   stopWatcher = startCommitWatcher(cfg, log, async () => {
     await mutex.runExclusive(async () => {
-      phase = "building";
       try {
         const result = await executeBuildPhase({ forceBuild: false });
         await waitForRunnable(cfg);
@@ -280,9 +305,10 @@ async function main() {
           await app.start();
         }
         lastError = null;
+        lastErrorPhase = null;
       } catch (e) {
-        lastError = e instanceof Error ? e.message : String(e);
-        log.error(lastError);
+        const msg = markError(e);
+        log.error(msg);
         phase = app.isRunning() ? "running" : "idle";
       }
     });

@@ -1,3 +1,20 @@
+export type LaneLifecycle = "starting" | "running" | "done" | "fail";
+
+export type StatusLaneId = "git" | "build" | "nodemon";
+
+export type StatusLane = {
+  id: StatusLaneId;
+  title: string;
+  status: LaneLifecycle;
+  detail: string;
+};
+
+export type StatusLanes = {
+  git: StatusLane;
+  build: StatusLane;
+  nodemon: StatusLane;
+};
+
 export type OrchestratorSnapshot = {
   phase: string;
   gitBranch: string;
@@ -14,6 +31,8 @@ export type OrchestratorSnapshot = {
   serverEntryPath: string;
   lastBuildAt: string | null;
   lastError: string | null;
+  lastErrorPhase: string | null;
+  lanes: StatusLanes;
   watchIntervalMs: number;
 };
 

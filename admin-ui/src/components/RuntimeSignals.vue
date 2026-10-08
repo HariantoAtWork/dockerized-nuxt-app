@@ -1,32 +1,57 @@
 <script setup lang="ts">
 import { computed } from "vue";
-import type { OrchestratorSnapshot } from "../types.ts";
+import type {
+  LaneLifecycle,
+  OrchestratorSnapshot,
+  StatusLane,
+} from "../types.ts";
 
 const props = defineProps<{
   snapshot: OrchestratorSnapshot | null;
 }>();
 
-const entryOk = computed(() => props.snapshot?.serverEntryExists === true);
-const nodemonOk = computed(() => props.snapshot?.appRunning === true);
+const STATUS_LABEL: Record<LaneLifecycle, string> = {
+  starting: "Starting",
+  running: "Running",
+  done: "Done",
+  fail: "Fail",
+};
+
+const fallbackLanes: StatusLane[] = [
+  {
+    id: "git",
+    title: "Git",
+    status: "starting",
+    detail: "Connecting…",
+  },
+  {
+    id: "build",
+    title: "Build",
+    status: "starting",
+    detail: "Connecting…",
+  },
+  {
+    id: "nodemon",
+    title: "Nodemon",
+    status: "starting",
+    detail: "Connecting…",
+  },
+];
+
+const lanes = computed((): StatusLane[] => {
+  const l = props.snapshot?.lanes;
+  if (!l) return fallbackLanes;
+  return [l.git, l.build, l.nodemon];
+});
 
 const readiness = computed(() => {
   if (!props.snapshot) return { label: "Connecting…", tone: "idle" as const };
-  if (entryOk.value && nodemonOk.value)
-    return { label: "Runtime live", tone: "live" as const };
-  if (entryOk.value && !nodemonOk.value)
-    return { label: "Build ready — app stopped", tone: "warn" as const };
-  if (!entryOk.value && nodemonOk.value)
-    return { label: "Process up — entry missing", tone: "bad" as const };
-  return { label: "Waiting for build output", tone: "idle" as const };
-});
-
-const entryPath = computed(
-  () => props.snapshot?.serverEntryPath ?? ".output/server/index.mjs",
-);
-
-const pidLabel = computed(() => {
-  const pid = props.snapshot?.appPid;
-  return pid != null ? `pid ${pid}` : "no process";
+  const statuses = lanes.value.map((l) => l.status);
+  if (statuses.includes("fail"))
+    return { label: "Something failed", tone: "bad" as const };
+  if (statuses.includes("running") || statuses.includes("starting"))
+    return { label: "In progress", tone: "busy" as const };
+  return { label: "All systems go", tone: "live" as const };
 });
 </script>
 
@@ -42,35 +67,32 @@ const pidLabel = computed(() => {
 
     <div class="grid">
       <article
+        v-for="lane in lanes"
+        :key="lane.id"
         class="signal"
-        :class="entryOk ? 'is-ok' : 'is-off'"
+        :data-status="lane.status"
         aria-live="polite"
       >
         <div class="signal-top">
-          <span class="signal-dot" aria-hidden="true" />
-          <span class="signal-label">Build entry</span>
+          <span
+            class="led"
+            :class="{ pulse: lane.status === 'starting' || lane.status === 'running' }"
+            :title="STATUS_LABEL[lane.status]"
+            aria-hidden="true"
+          />
+          <span class="signal-label">{{ lane.title }}</span>
         </div>
-        <p class="signal-state">
-          {{ entryOk ? "Present" : "Missing" }}
-        </p>
-        <p class="signal-meta mono" :title="entryPath">{{ entryPath }}</p>
-      </article>
-
-      <article
-        class="signal"
-        :class="nodemonOk ? 'is-ok' : 'is-off'"
-        aria-live="polite"
-      >
-        <div class="signal-top">
-          <span class="signal-dot" :class="{ pulse: nodemonOk }" aria-hidden="true" />
-          <span class="signal-label">Nodemon</span>
-        </div>
-        <p class="signal-state">
-          {{ nodemonOk ? "Running" : "Stopped" }}
-        </p>
-        <p class="signal-meta mono">{{ pidLabel }}</p>
+        <p class="signal-state">{{ STATUS_LABEL[lane.status] }}</p>
+        <p class="signal-meta" :title="lane.detail">{{ lane.detail }}</p>
       </article>
     </div>
+
+    <ul class="legend" aria-label="LED legend">
+      <li data-status="starting"><span class="led mini" /> Starting</li>
+      <li data-status="running"><span class="led mini pulse" /> Running</li>
+      <li data-status="done"><span class="led mini" /> Done</li>
+      <li data-status="fail"><span class="led mini" /> Fail</li>
+    </ul>
   </section>
 </template>
 
@@ -82,13 +104,18 @@ const pidLabel = computed(() => {
   --line: rgba(16, 36, 31, 0.12);
   --ok: #1f8a5b;
   --ok-glow: rgba(31, 138, 91, 0.45);
-  --warn: #b7791f;
+  --busy: #2b6cb0;
+  --warn: #c99212;
   --bad: #c23b3b;
   --idle: #6b7c76;
+  --led-starting: #e6a817;
+  --led-running: #2b6cb0;
+  --led-done: #1f8a5b;
+  --led-fail: #c23b3b;
 
   position: relative;
   overflow: hidden;
-  padding: 1.25rem 1.35rem 1.4rem;
+  padding: 1.25rem 1.35rem 1.25rem;
   border-radius: 1.15rem;
   border: 1px solid var(--line);
   background:
@@ -154,9 +181,10 @@ const pidLabel = computed(() => {
   animation: breathe 2.4s ease-in-out infinite;
 }
 
-.signals[data-tone="warn"] .lamp {
-  background: var(--warn);
-  box-shadow: 0 0 0 4px rgba(183, 121, 31, 0.18);
+.signals[data-tone="busy"] .lamp {
+  background: var(--busy);
+  box-shadow: 0 0 0 4px rgba(43, 108, 176, 0.2), 0 0 14px rgba(43, 108, 176, 0.35);
+  animation: breathe 1.4s ease-in-out infinite;
 }
 
 .signals[data-tone="bad"] .lamp {
@@ -167,7 +195,7 @@ const pidLabel = computed(() => {
 .grid {
   position: relative;
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 0.85rem;
 }
 
@@ -179,40 +207,88 @@ const pidLabel = computed(() => {
   backdrop-filter: blur(8px);
   transition:
     border-color 0.3s ease,
-    transform 0.3s ease,
     background 0.3s ease;
 }
 
-.signal.is-ok {
+.signal[data-status="starting"] {
+  border-color: rgba(230, 168, 23, 0.4);
+  background: linear-gradient(180deg, rgba(255, 249, 230, 0.95), rgba(255, 255, 255, 0.85));
+}
+
+.signal[data-status="running"] {
+  border-color: rgba(43, 108, 176, 0.4);
+  background: linear-gradient(180deg, rgba(235, 244, 255, 0.95), rgba(255, 255, 255, 0.85));
+}
+
+.signal[data-status="done"] {
   border-color: rgba(31, 138, 91, 0.35);
   background: linear-gradient(180deg, rgba(236, 253, 245, 0.95), rgba(255, 255, 255, 0.85));
 }
 
-.signal.is-off {
-  border-color: rgba(16, 36, 31, 0.1);
+.signal[data-status="fail"] {
+  border-color: rgba(194, 59, 59, 0.4);
+  background: linear-gradient(180deg, rgba(254, 240, 240, 0.95), rgba(255, 255, 255, 0.85));
 }
 
 .signal-top {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.55rem;
   margin-bottom: 0.55rem;
 }
 
-.signal-dot {
-  width: 0.55rem;
-  height: 0.55rem;
+.led {
+  width: 0.7rem;
+  height: 0.7rem;
   border-radius: 999px;
   background: #9aa8a2;
-  transition: background 0.3s ease;
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.45);
+  flex-shrink: 0;
+  transition:
+    background 0.3s ease,
+    box-shadow 0.3s ease;
 }
 
-.signal.is-ok .signal-dot {
-  background: var(--ok);
+.signal[data-status="starting"] .led,
+.legend li[data-status="starting"] .led {
+  background: var(--led-starting);
+  box-shadow:
+    0 0 0 3px rgba(230, 168, 23, 0.22),
+    0 0 10px rgba(230, 168, 23, 0.55);
 }
 
-.signal-dot.pulse {
-  animation: breathe 2s ease-in-out infinite;
+.signal[data-status="running"] .led,
+.legend li[data-status="running"] .led {
+  background: var(--led-running);
+  box-shadow:
+    0 0 0 3px rgba(43, 108, 176, 0.22),
+    0 0 10px rgba(43, 108, 176, 0.55);
+}
+
+.signal[data-status="done"] .led,
+.legend li[data-status="done"] .led {
+  background: var(--led-done);
+  box-shadow:
+    0 0 0 3px rgba(31, 138, 91, 0.18),
+    0 0 8px rgba(31, 138, 91, 0.4);
+}
+
+.signal[data-status="fail"] .led,
+.legend li[data-status="fail"] .led {
+  background: var(--led-fail);
+  box-shadow:
+    0 0 0 3px rgba(194, 59, 59, 0.2),
+    0 0 10px rgba(194, 59, 59, 0.45);
+  animation: blink 1.1s steps(1, end) infinite;
+}
+
+.led.pulse {
+  animation: breathe 1.6s ease-in-out infinite;
+}
+
+.led.mini {
+  width: 0.45rem;
+  height: 0.45rem;
 }
 
 .signal-label {
@@ -239,10 +315,28 @@ const pidLabel = computed(() => {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  font-family: "JetBrains Mono", ui-monospace, monospace;
 }
 
-.mono {
-  font-family: "JetBrains Mono", ui-monospace, monospace;
+.legend {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem 1.1rem;
+  margin: 1rem 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.legend li {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
 }
 
 @keyframes breathe {
@@ -252,8 +346,18 @@ const pidLabel = computed(() => {
     opacity: 1;
   }
   50% {
-    transform: scale(1.15);
-    opacity: 0.75;
+    transform: scale(1.18);
+    opacity: 0.72;
+  }
+}
+
+@keyframes blink {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
   }
 }
 
@@ -268,7 +372,7 @@ const pidLabel = computed(() => {
   }
 }
 
-@media (max-width: 640px) {
+@media (max-width: 720px) {
   .grid {
     grid-template-columns: 1fr;
   }
