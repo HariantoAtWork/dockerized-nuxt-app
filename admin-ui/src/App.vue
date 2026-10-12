@@ -4,6 +4,7 @@ import { api } from "./api.ts";
 import BranchSwitcher from "./components/BranchSwitcher.vue";
 import CommitStatus from "./components/CommitStatus.vue";
 import GitGraphPanel from "./components/GitGraphPanel.vue";
+import LogsPanel from "./components/LogsPanel.vue";
 import RuntimeSignals from "./components/RuntimeSignals.vue";
 import ToastStack from "./components/ToastStack.vue";
 import { useToast } from "./composables/useToast.ts";
@@ -14,8 +15,10 @@ const { items: toastItems, push: toast } = useToast();
 const snapshot = ref<OrchestratorSnapshot | null>(null);
 const statusJson = ref<string | null>(null);
 const statusError = ref<string | null>(null);
-const logsText = ref<string>("");
-const logsError = ref<string | null>(null);
+const orchestratorLogsText = ref<string>("");
+const orchestratorLogsError = ref<string | null>(null);
+const appLogsText = ref<string>("");
+const appLogsError = ref<string | null>(null);
 const gitGraphRows = ref<GitGraphRow[]>([]);
 const gitGraphError = ref<string | null>(null);
 const gitGraphLoading = ref(true);
@@ -33,7 +36,8 @@ async function refresh(opts?: { silent?: boolean }) {
   const silent = opts?.silent ?? false;
   let ok = true;
   statusError.value = null;
-  logsError.value = null;
+  orchestratorLogsError.value = null;
+  appLogsError.value = null;
   try {
     const s = await api<OrchestratorSnapshot>("/api/status");
     snapshot.value = s;
@@ -48,10 +52,18 @@ async function refresh(opts?: { silent?: boolean }) {
   }
   try {
     const l = await api<{ lines: string[] }>("/api/logs?n=120");
-    logsText.value = l.lines.join("\n");
+    orchestratorLogsText.value = l.lines.join("\n");
   } catch (e) {
     ok = false;
-    logsError.value = e instanceof Error ? e.message : String(e);
+    orchestratorLogsError.value =
+      e instanceof Error ? e.message : String(e);
+  }
+  try {
+    const l = await api<{ lines: string[] }>("/api/logs/app?n=120");
+    appLogsText.value = l.lines.join("\n");
+  } catch (e) {
+    ok = false;
+    appLogsError.value = e instanceof Error ? e.message : String(e);
   }
   try {
     const g = await api<{ rows: GitGraphRow[] }>("/api/git-graph?n=35");
@@ -210,11 +222,12 @@ onUnmounted(() => {
             <p v-else class="muted">Loading…</p>
           </details>
 
-          <section class="panel logs-panel">
-            <h2>Recent logs</h2>
-            <pre v-if="!logsError" class="logs">{{ logsText }}</pre>
-            <p v-else class="err">{{ logsError }}</p>
-          </section>
+          <LogsPanel
+            :orchestrator-text="orchestratorLogsText"
+            :app-text="appLogsText"
+            :orchestrator-error="orchestratorLogsError"
+            :app-error="appLogsError"
+          />
         </section>
 
         <aside class="side-panel">
@@ -374,14 +387,7 @@ code {
   margin-bottom: 0.65rem;
 }
 
-.logs-panel h2 {
-  margin: 0 0 0.65rem;
-  font-size: 0.92rem;
-  font-weight: 600;
-}
-
-.json,
-.logs {
+.json {
   margin: 0;
   padding: 0.85rem;
   border-radius: 0.7rem;
@@ -391,10 +397,6 @@ code {
   font-family: "JetBrains Mono", ui-monospace, monospace;
   font-size: 0.75rem;
   line-height: 1.45;
-}
-
-.logs {
-  max-height: 24rem;
 }
 
 .err {

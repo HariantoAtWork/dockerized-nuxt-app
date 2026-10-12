@@ -1,6 +1,6 @@
 import type { AppConfig } from "./config.ts";
 import { isFile } from "./fs-utils.ts";
-import type { RingLog } from "./logger.ts";
+import type { LineRing, RingLog } from "./logger.ts";
 
 export type AppRunner = {
   start: () => Promise<void>;
@@ -9,7 +9,45 @@ export type AppRunner = {
   getPid: () => number | null;
 };
 
-export function createAppRunner(cfg: AppConfig, log: RingLog): AppRunner {
+async function pumpChildStream(
+  stream: ReadableStream<Uint8Array> | null | undefined,
+  channel: "stdout" | "stderr",
+  appLog: LineRing,
+): Promise<void> {
+  if (!stream) return;
+  const reader = stream.getReader();
+  const decoder = new TextDecoder();
+  let pending = "";
+
+  const flushLine = (raw: string) => {
+    const line = raw.replace(/\r$/, "");
+    const stamped = `${new Date().toISOString()} [${channel}] ${line}`;
+    appLog.push(stamped);
+    if (channel === "stderr") process.stderr.write(`${line}\n`);
+    else process.stdout.write(`${line}\n`);
+  };
+
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      pending += decoder.decode(value, { stream: true });
+      const parts = pending.split("\n");
+      pending = parts.pop() ?? "";
+      for (const part of parts) flushLine(part);
+    }
+    pending += decoder.decode();
+    if (pending) flushLine(pending);
+  } catch {
+    /* process killed / stream closed */
+  }
+}
+
+export function createAppRunner(
+  cfg: AppConfig,
+  log: RingLog,
+  appLog: LineRing,
+): AppRunner {
   let child: ReturnType<typeof Bun.spawn> | null = null;
   const serverEntry = `${cfg.appOutput}/server/index.mjs`;
 
@@ -67,11 +105,13 @@ export function createAppRunner(cfg: AppConfig, log: RingLog): AppRunner {
         ],
         {
           cwd: cfg.appOutput,
-          stdout: "inherit",
-          stderr: "inherit",
+          stdout: "pipe",
+          stderr: "pipe",
           env: process.env,
         },
       );
+      void pumpChildStream(child.stdout, "stdout", appLog);
+      void pumpChildStream(child.stderr, "stderr", appLog);
       void child.exited.then((code) => {
         log.warn(`Application process exited with code ${code}`);
         child = null;

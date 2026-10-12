@@ -9,7 +9,7 @@ import { commitSubject } from "./git-commit.ts";
 import { assertValidGitCommit } from "./git-commit-ref.ts";
 import { getGitGraph } from "./git-graph.ts";
 import { toRepoWebUrl } from "./git-web-url.ts";
-import { createRingLog } from "./logger.ts";
+import { createLineRing, createRingLog } from "./logger.ts";
 import { Mutex } from "./mutex.ts";
 import { redactGitUrl } from "./redact.ts";
 import {
@@ -58,12 +58,13 @@ async function main() {
   }
 
   const log = createRingLog(cfg.verboseLogging);
+  const appLog = createLineRing();
   log.info(
     `Orchestrator starting; repo URL: ${redactGitUrl(cfg.githubRepoUrl)}; branch: ${cfg.gitBranch}`,
   );
 
   const mutex = new Mutex();
-  const app = createAppRunner(cfg, log);
+  const app = createAppRunner(cfg, log, appLog);
 
   let phase: OrchestratorPhase = "idle";
   let lastBuildAt: string | null = null;
@@ -165,6 +166,7 @@ async function main() {
     getSnapshot,
     getGitGraph: async (n) => getGitGraph(cfg.githubRepo, n),
     getLogs: (n) => log.tail(n),
+    getAppLogs: (n) => appLog.tail(n),
     listBranches: async () => ({
       current: cfg.gitBranch,
       branches: await listRemoteBranches(cfg),

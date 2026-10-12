@@ -7,6 +7,7 @@ export type AdminHandlers = {
   getSnapshot: () => OrchestratorSnapshot | Promise<OrchestratorSnapshot>;
   getGitGraph: (limit: number) => Promise<GitGraphSnapshot>;
   getLogs: (n: number) => string[];
+  getAppLogs: (n: number) => string[];
   listBranches: () => Promise<{ current: string; branches: string[] }>;
   switchBranch: (branch: string) => Promise<void>;
   switchCommit: (commit: string) => Promise<void>;
@@ -52,7 +53,16 @@ export function startAdminServer(
       if (req.method === "GET" && pathname === "/api/logs") {
         const n = Number.parseInt(url.searchParams.get("n") ?? "120", 10);
         return json({
+          source: "orchestrator",
           lines: handlers.getLogs(Number.isFinite(n) ? n : 120),
+        });
+      }
+
+      if (req.method === "GET" && pathname === "/api/logs/app") {
+        const n = Number.parseInt(url.searchParams.get("n") ?? "120", 10);
+        return json({
+          source: "app",
+          lines: handlers.getAppLogs(Number.isFinite(n) ? n : 120),
         });
       }
 
